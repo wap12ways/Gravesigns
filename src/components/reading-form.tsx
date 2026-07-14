@@ -51,10 +51,11 @@ function listTimeZones(): string[] {
 
 const LOADING_LINES = [
   "Casting the sky for the moment of crossing…",
-  "Placing the Moon, the soul's quiet vehicle…",
+  "Tabulating dignities, lots, and fixed stars…",
+  "Weighing each testimony the chart offers…",
   "Reading Saturn and Pluto at the threshold…",
-  "Tracing the aspects into a single pattern…",
   "Composing the reading with care…",
+  "Reviewing every line against the chart…",
 ];
 
 export function ReadingForm() {

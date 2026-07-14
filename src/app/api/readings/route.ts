@@ -9,9 +9,10 @@ import type {
   SubjectType,
 } from "@/lib/types";
 
-// Reading generation streams from Claude and can run longer than the default
-// serverless budget; give it room. (On Vercel Hobby the effective cap is 60s.)
-export const maxDuration = 60;
+// The reading now runs three sequential Claude passes (judgment → composition →
+// verification), so it needs real headroom. Vercel honours this up to the plan's
+// ceiling — 300s on Pro/Enterprise, capped to 60s on Hobby.
+export const maxDuration = 300;
 export const runtime = "nodejs";
 
 /**
