@@ -40,6 +40,9 @@ export function ChartSummary({ chart }: { chart: DeathChart }) {
             value={`${fmt(chart.midheaven.degreeInSign)} ${chart.midheaven.sign}`}
           />
         )}
+        {chart.timezone && (
+          <Stat label="Time Zone" value={chart.timezone.replace(/_/g, " ")} />
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">

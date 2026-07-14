@@ -17,14 +17,17 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.469.0",
+    "luxon": "^3.7.2",
     "next": "^15.5.20",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "sweph-wasm": "^2.6.9",
     "tailwind-merge": "^2.6.0",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "tz-lookup": "^6.1.25"
   },
   "devDependencies": {
+    "@types/luxon": "^3.7.2",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

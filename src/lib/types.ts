@@ -57,6 +57,8 @@ export interface DeathChart {
   moonPhase: string;
   /** Which Swiss Ephemeris data source produced the positions */
   ephemeris: string;
+  /** The IANA civil time zone used to resolve the moment to UTC, if known */
+  timezone: string | null;
 }
 
 export interface Reading {

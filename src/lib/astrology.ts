@@ -20,6 +20,7 @@ import { createRequire } from "module";
 import path from "path";
 import { readFileSync } from "fs";
 import type { Aspect, DeathChart, PlanetPosition } from "./types";
+import { resolveDeathMoment } from "./time";
 
 const SIGNS = [
   "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
@@ -198,32 +199,6 @@ function moonPhaseName(sunLon: number, moonLon: number): string {
   return "Waning Crescent";
 }
 
-/**
- * Build the UTC Date used for the chart. When no time is supplied we assume
- * local noon (a long-standing convention for undated charts), and when no
- * location is supplied we treat the supplied clock time as UTC.
- */
-export function buildTimestamp(
-  dateOfDeath: string,
-  timeOfDeath: string | null | undefined,
-  longitude: number | null | undefined
-): { date: Date; timeKnown: boolean } {
-  const [y, m, d] = dateOfDeath.split("-").map(Number);
-  const timeKnown = Boolean(timeOfDeath && /^\d{1,2}:\d{2}$/.test(timeOfDeath));
-  const [hh, mm] = timeKnown
-    ? (timeOfDeath as string).split(":").map(Number)
-    : [12, 0];
-
-  // Rough local-time -> UTC conversion using longitude (15° per hour). Good
-  // enough for a symbolic chart; a production build would resolve the true
-  // civil timezone (including DST) from the location.
-  const tzOffsetHours =
-    typeof longitude === "number" ? Math.round(longitude / 15) : 0;
-
-  const utcMillis = Date.UTC(y, m - 1, d, hh - tzOffsetHours, mm, 0);
-  return { date: new Date(utcMillis), timeKnown };
-}
-
 export async function computeDeathChart(params: {
   dateOfDeath: string;
   timeOfDeath?: string | null;
@@ -231,7 +206,14 @@ export async function computeDeathChart(params: {
   longitude?: number | null;
 }): Promise<DeathChart> {
   const { dateOfDeath, timeOfDeath, latitude, longitude } = params;
-  const { date, timeKnown } = buildTimestamp(dateOfDeath, timeOfDeath, longitude);
+  // Resolve the exact UTC instant using the civil time zone at the place of
+  // death (DST + historical rules), so the Ascendant and houses are accurate.
+  const { date, timeKnown, timezone } = resolveDeathMoment(
+    dateOfDeath,
+    timeOfDeath,
+    latitude ?? null,
+    longitude ?? null
+  );
 
   const { swe, epheLoaded } = await getSwe();
   const hourUt =
@@ -361,6 +343,7 @@ export async function computeDeathChart(params: {
   return {
     timestampUtc: date.toISOString(),
     ephemeris,
+    timezone,
     timeKnown,
     locationKnown: Boolean(locationKnown && ascLon !== null),
     latitude: typeof latitude === "number" ? latitude : null,
@@ -389,6 +372,9 @@ export function chartToText(chart: DeathChart, _fullName: string): string {
   lines.push(
     `Time of death known: ${chart.timeKnown ? "yes" : "no (noon assumed)"}; Location known: ${chart.locationKnown ? "yes" : "no"}`
   );
+  if (chart.timezone) {
+    lines.push(`Civil time zone at place of death: ${chart.timezone}`);
+  }
   if (chart.ascendant) {
     lines.push(
       `Ascendant: ${fmt(chart.ascendant.degreeInSign)} ${chart.ascendant.sign}`

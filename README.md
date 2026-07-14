@@ -141,7 +141,14 @@ fetch and no native compilation**.
 
 Positions are true geocentric apparent longitudes in the tropical zodiac of
 date. Houses are **Placidus** (whole-sign fallback at extreme latitudes)
-computed from the Swiss `swe_houses` Ascendant/Midheaven. If the data files
+computed from the Swiss `swe_houses` Ascendant/Midheaven.
+
+**Time zones are resolved properly**, so the Ascendant and houses are accurate:
+the geocoded coordinates are mapped to their civil IANA zone (`tz-lookup`), and
+the local time of death is converted to UTC with `luxon`, applying daylight
+saving and historical zone rules from the IANA database — no external service.
+The resolved zone is recorded on the chart (`chart.timezone`) and shown in the
+UI. (For border-exact zone resolution, `geo-tz` can replace `tz-lookup`.) If the data files
 can't be loaded, or a date falls outside their range, the engine falls back —
 per body — to Swiss Ephemeris's built-in analytical **Moshier** model (still
 arcsecond-accurate), so a reading is always produced. The chart records which
