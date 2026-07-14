@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
   // 1) Calculate the death chart.
   let chart;
   try {
-    chart = computeDeathChart({ dateOfDeath, timeOfDeath, latitude, longitude });
+    chart = await computeDeathChart({ dateOfDeath, timeOfDeath, latitude, longitude });
   } catch (err) {
     console.error("Chart calculation failed:", err);
     return NextResponse.json(

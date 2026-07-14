@@ -1,14 +1,22 @@
 /**
- * Death Chart calculation.
+ * Death Chart calculation — powered by the Swiss Ephemeris.
  *
- * Uses `astronomy-engine`, a high-precision pure-JavaScript ephemeris (VSOP87 /
- * modern models) that runs anywhere Node runs — no native bindings, no data
- * files — so it deploys cleanly to Vercel serverless functions. Geocentric
- * J2000 ecliptic longitudes are corrected to the tropical zodiac of date by a
- * precession term, matching the reference frame professional astrologers work
- * in. Swiss Ephemeris can be substituted here without changing the API surface.
+ * We use `sweph-wasm`, a WebAssembly build of the Swiss Ephemeris (the same
+ * C library professional astrologers rely on), run in **Moshier mode**
+ * (`SEFLG_MOSEPH`). Moshier is Swiss Ephemeris's built-in analytical model:
+ * arcsecond-accurate and self-contained, so it needs none of the external
+ * `.se1` data files — which keeps the app deployable on Vercel's serverless
+ * filesystem with zero native compilation. To run in full Swiss mode instead,
+ * ship the `.se1` sources, call `swe.swe_set_ephe_path(...)`, and drop the
+ * `SEFLG_MOSEPH` flag; nothing else here changes.
+ *
+ * The WASM module is instantiated from its binary bytes (read via fs), which
+ * avoids the Emscripten `fetch`-based loader that doesn't work in Node. The
+ * instance is created once and reused across invocations.
  */
-import { Body, GeoVector, Ecliptic, SiderealTime } from "astronomy-engine";
+import { createRequire } from "module";
+import path from "path";
+import { readFileSync } from "fs";
 import type { Aspect, DeathChart, PlanetPosition } from "./types";
 
 const SIGNS = [
@@ -29,19 +37,6 @@ const MODALITIES: Record<string, string> = {
   Gemini: "Mutable", Virgo: "Mutable", Sagittarius: "Mutable", Pisces: "Mutable",
 };
 
-const PLANET_BODIES: { name: string; body: Body; canRetrograde: boolean }[] = [
-  { name: "Sun", body: Body.Sun, canRetrograde: false },
-  { name: "Moon", body: Body.Moon, canRetrograde: false },
-  { name: "Mercury", body: Body.Mercury, canRetrograde: true },
-  { name: "Venus", body: Body.Venus, canRetrograde: true },
-  { name: "Mars", body: Body.Mars, canRetrograde: true },
-  { name: "Jupiter", body: Body.Jupiter, canRetrograde: true },
-  { name: "Saturn", body: Body.Saturn, canRetrograde: true },
-  { name: "Uranus", body: Body.Uranus, canRetrograde: true },
-  { name: "Neptune", body: Body.Neptune, canRetrograde: true },
-  { name: "Pluto", body: Body.Pluto, canRetrograde: true },
-];
-
 const ASPECT_DEFS: { name: string; angle: number; orb: number }[] = [
   { name: "Conjunction", angle: 0, orb: 8 },
   { name: "Sextile", angle: 60, orb: 5 },
@@ -50,43 +45,67 @@ const ASPECT_DEFS: { name: string; angle: number; orb: number }[] = [
   { name: "Opposition", angle: 180, orb: 8 },
 ];
 
+// Minimal typing for just the Swiss Ephemeris surface we use.
+interface SwissEph {
+  SE_SUN: number;
+  SE_MOON: number;
+  SE_MERCURY: number;
+  SE_VENUS: number;
+  SE_MARS: number;
+  SE_JUPITER: number;
+  SE_SATURN: number;
+  SE_URANUS: number;
+  SE_NEPTUNE: number;
+  SE_PLUTO: number;
+  SE_TRUE_NODE: number;
+  SEFLG_MOSEPH: number;
+  SEFLG_SPEED: number;
+  swe_julday(y: number, m: number, d: number, hourUt: number, gregflag: number): number;
+  swe_calc_ut(tjdUt: number, ipl: number, iflag: number): number[];
+  swe_houses(
+    tjdUt: number,
+    geolat: number,
+    geolon: number,
+    hsys: string
+  ): { cusps: number[]; ascmc: number[] };
+  swe_close(): void;
+}
+
+const GREG_CAL = 1;
+
+// Cached, lazily-initialised Swiss Ephemeris instance (per server process).
+let swePromise: Promise<SwissEph> | null = null;
+
+async function getSwe(): Promise<SwissEph> {
+  if (swePromise) return swePromise;
+  swePromise = (async () => {
+    // Use a distinctly-named require handle so the bundler doesn't rewrite
+    // these calls (webpack turns a literal `require.resolve(...)` into a
+    // numeric module id). `sweph-wasm` is a serverExternalPackage, so this
+    // loads it from node_modules at runtime.
+    const nodeRequire = createRequire(import.meta.url);
+    const factoryMod = nodeRequire("sweph-wasm/wasm/swisseph");
+    const factory = factoryMod.default || factoryMod;
+    const swephMod = nodeRequire("sweph-wasm");
+    const SwissEPH = swephMod.default || swephMod;
+
+    // Read the .wasm bytes directly and hand them to Emscripten, bypassing its
+    // fetch-based loader (which fails under Node / serverless).
+    const resolved = nodeRequire.resolve("sweph-wasm/wasm/swisseph");
+    const wasmDir =
+      typeof resolved === "string"
+        ? path.dirname(resolved)
+        : path.join(process.cwd(), "node_modules/sweph-wasm/dist/wasm");
+    const wasmBinary = readFileSync(path.join(wasmDir, "swisseph.wasm"));
+
+    const wasmModule = await factory({ wasmBinary });
+    return new SwissEPH(wasmModule) as SwissEph;
+  })();
+  return swePromise;
+}
+
 function norm360(x: number): number {
   return ((x % 360) + 360) % 360;
-}
-
-function julianCenturies(date: Date): number {
-  const jd = date.getTime() / 86400000 + 2440587.5;
-  return (jd - 2451545.0) / 36525;
-}
-
-/** Mean obliquity of the ecliptic (degrees) */
-function meanObliquity(T: number): number {
-  return (
-    23.439291111 -
-    0.0130041667 * T -
-    1.638889e-7 * T * T +
-    5.036111e-7 * T * T * T
-  );
-}
-
-/** Geocentric tropical (of-date) ecliptic longitude for a body, in degrees */
-function eclipticLongitude(body: Body, date: Date, T: number): number {
-  const vec = GeoVector(body, date, true);
-  const ecl = Ecliptic(vec); // J2000 mean ecliptic
-  // Precession correction from J2000 to the equinox of date (~50.29"/yr).
-  const precession = (T * 100 * 50.290966) / 3600;
-  return norm360(ecl.elon + precession);
-}
-
-/** Mean lunar North Node (degrees) — always retrograde in mean motion */
-function meanNorthNode(T: number): number {
-  return norm360(
-    125.0445479 -
-      1934.1362891 * T +
-      0.0020754 * T * T +
-      (T * T * T) / 467441 -
-      (T * T * T * T) / 60616000
-  );
 }
 
 function signFromLongitude(lon: number): { sign: string; degreeInSign: number } {
@@ -94,46 +113,17 @@ function signFromLongitude(lon: number): { sign: string; degreeInSign: number } 
   return { sign: SIGNS[idx], degreeInSign: norm360(lon) % 30 };
 }
 
-/** Placidus is intractable in pure JS; we use equal-house from the Ascendant. */
-function houseFromLongitude(lon: number, ascLon: number): number {
-  const diff = norm360(lon - ascLon);
-  return Math.floor(diff / 30) + 1;
-}
-
-function computeAngles(
-  date: Date,
-  latitude: number,
-  longitude: number,
-  T: number
-): { ascLon: number; mcLon: number } {
-  const gast = SiderealTime(date); // Greenwich apparent sidereal time, hours
-  const ramc = norm360(gast * 15 + longitude); // right ascension of MC, degrees
-  const eps = meanObliquity(T);
-
-  const ramcR = (ramc * Math.PI) / 180;
-  const epsR = (eps * Math.PI) / 180;
-  const latR = (latitude * Math.PI) / 180;
-
-  const mcLon = norm360(
-    (Math.atan2(Math.sin(ramcR), Math.cos(ramcR) * Math.cos(epsR)) * 180) /
-      Math.PI
-  );
-
-  let ascLon = norm360(
-    (Math.atan2(
-      Math.cos(ramcR),
-      -(Math.sin(ramcR) * Math.cos(epsR) + Math.tan(latR) * Math.sin(epsR))
-    ) *
-      180) /
-      Math.PI
-  );
-
-  // The rising degree is always zodiacally ahead of the culminating degree.
-  if (norm360(ascLon - mcLon) > 180) {
-    ascLon = norm360(ascLon + 180);
+/** Whole/unequal house assignment from Swiss house cusps (index 1..12). */
+function houseFromCusps(lon: number, cusps: number[]): number | null {
+  const x = norm360(lon);
+  for (let h = 1; h <= 12; h++) {
+    const start = norm360(cusps[h]);
+    const end = norm360(cusps[h === 12 ? 1 : h + 1]);
+    const span = norm360(end - start);
+    const off = norm360(x - start);
+    if (span === 0 || off < span) return h;
   }
-
-  return { ascLon, mcLon };
+  return null;
 }
 
 function moonPhaseName(sunLon: number, moonLon: number): string {
@@ -174,65 +164,80 @@ export function buildTimestamp(
   return { date: new Date(utcMillis), timeKnown };
 }
 
-export function computeDeathChart(params: {
+export async function computeDeathChart(params: {
   dateOfDeath: string;
   timeOfDeath?: string | null;
   latitude?: number | null;
   longitude?: number | null;
-}): DeathChart {
+}): Promise<DeathChart> {
   const { dateOfDeath, timeOfDeath, latitude, longitude } = params;
   const { date, timeKnown } = buildTimestamp(dateOfDeath, timeOfDeath, longitude);
-  const T = julianCenturies(date);
+
+  const swe = await getSwe();
+  const hourUt =
+    date.getUTCHours() +
+    date.getUTCMinutes() / 60 +
+    date.getUTCSeconds() / 3600;
+  const jd = swe.swe_julday(
+    date.getUTCFullYear(),
+    date.getUTCMonth() + 1,
+    date.getUTCDate(),
+    hourUt,
+    GREG_CAL
+  );
+  const iflag = swe.SEFLG_MOSEPH | swe.SEFLG_SPEED;
 
   const locationKnown =
     typeof latitude === "number" &&
     typeof longitude === "number" &&
     timeKnown; // houses only meaningful with both a time and a place
 
+  // Houses + angles (Placidus, with a whole-sign fallback at extreme latitude)
+  let cusps: number[] | null = null;
   let ascLon: number | null = null;
   let mcLon: number | null = null;
   if (locationKnown) {
-    const angles = computeAngles(date, latitude as number, longitude as number, T);
-    ascLon = angles.ascLon;
-    mcLon = angles.mcLon;
+    let h = swe.swe_houses(jd, latitude as number, longitude as number, "P");
+    if (!Number.isFinite(h.ascmc?.[0]) || !Number.isFinite(h.cusps?.[1])) {
+      h = swe.swe_houses(jd, latitude as number, longitude as number, "W");
+    }
+    if (Number.isFinite(h.ascmc?.[0])) {
+      cusps = h.cusps;
+      ascLon = norm360(h.ascmc[0]);
+      mcLon = norm360(h.ascmc[1]);
+    }
   }
 
-  const planets: PlanetPosition[] = PLANET_BODIES.map(({ name, body, canRetrograde }) => {
-    const lon = eclipticLongitude(body, date, T);
-    let retrograde = false;
-    if (canRetrograde) {
-      const later = new Date(date.getTime() + 2 * 86400000);
-      const lonLater = eclipticLongitude(body, later, julianCenturies(later));
-      // account for wrap-around
-      let delta = lonLater - lon;
-      if (delta > 180) delta -= 360;
-      if (delta < -180) delta += 360;
-      retrograde = delta < 0;
-    }
+  const bodyDefs: { name: string; ipl: number }[] = [
+    { name: "Sun", ipl: swe.SE_SUN },
+    { name: "Moon", ipl: swe.SE_MOON },
+    { name: "Mercury", ipl: swe.SE_MERCURY },
+    { name: "Venus", ipl: swe.SE_VENUS },
+    { name: "Mars", ipl: swe.SE_MARS },
+    { name: "Jupiter", ipl: swe.SE_JUPITER },
+    { name: "Saturn", ipl: swe.SE_SATURN },
+    { name: "Uranus", ipl: swe.SE_URANUS },
+    { name: "Neptune", ipl: swe.SE_NEPTUNE },
+    { name: "Pluto", ipl: swe.SE_PLUTO },
+    { name: "North Node", ipl: swe.SE_TRUE_NODE },
+  ];
+
+  const planets: PlanetPosition[] = bodyDefs.map(({ name, ipl }) => {
+    const r = swe.swe_calc_ut(jd, ipl, iflag);
+    const lon = norm360(r[0]);
+    const speed = r[3];
     const { sign, degreeInSign } = signFromLongitude(lon);
     return {
       name,
       longitude: lon,
       sign,
       degreeInSign,
-      house: ascLon !== null ? houseFromLongitude(lon, ascLon) : null,
-      retrograde,
+      house: cusps ? houseFromCusps(lon, cusps) : null,
+      retrograde: speed < 0,
     };
   });
 
-  // North Node
-  const nodeLon = meanNorthNode(T);
-  const nodeSign = signFromLongitude(nodeLon);
-  planets.push({
-    name: "North Node",
-    longitude: nodeLon,
-    sign: nodeSign.sign,
-    degreeInSign: nodeSign.degreeInSign,
-    house: ascLon !== null ? houseFromLongitude(nodeLon, ascLon) : null,
-    retrograde: true,
-  });
-
-  // Aspects (between the ten bodies + node)
+  // Aspects between the bodies (tightest first).
   const aspects: Aspect[] = [];
   for (let i = 0; i < planets.length; i++) {
     for (let j = i + 1; j < planets.length; j++) {
@@ -254,7 +259,7 @@ export function computeDeathChart(params: {
   }
   aspects.sort((x, y) => x.orb - y.orb);
 
-  // Dominant element / modality across the personal planets + luminaries
+  // Dominant element / modality across the personal planets + luminaries.
   const personal = ["Sun", "Moon", "Mercury", "Venus", "Mars"];
   const elementCount: Record<string, number> = {};
   const modalityCount: Record<string, number> = {};
@@ -275,7 +280,7 @@ export function computeDeathChart(params: {
   return {
     timestampUtc: date.toISOString(),
     timeKnown,
-    locationKnown: Boolean(locationKnown),
+    locationKnown: Boolean(locationKnown && ascLon !== null),
     latitude: typeof latitude === "number" ? latitude : null,
     longitude: typeof longitude === "number" ? longitude : null,
     ascendant: ascLon !== null ? signFromLongitude(ascLon) : null,
@@ -289,7 +294,7 @@ export function computeDeathChart(params: {
 }
 
 /** Compact, human-readable summary of the chart for the AI prompt. */
-export function chartToText(chart: DeathChart, fullName: string): string {
+export function chartToText(chart: DeathChart, _fullName: string): string {
   const fmt = (deg: number) => {
     const d = Math.floor(deg);
     const m = Math.round((deg - d) * 60);
@@ -298,6 +303,7 @@ export function chartToText(chart: DeathChart, fullName: string): string {
 
   const lines: string[] = [];
   lines.push(`Chart moment (UTC): ${chart.timestampUtc}`);
+  lines.push(`Ephemeris: Swiss Ephemeris (Moshier), tropical zodiac`);
   lines.push(
     `Time of death known: ${chart.timeKnown ? "yes" : "no (noon assumed)"}; Location known: ${chart.locationKnown ? "yes" : "no"}`
   );

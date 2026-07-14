@@ -23,7 +23,7 @@ transition.
 - **Tailwind CSS** + **shadcn/ui**-style components
 - **Supabase** (Postgres) for storing readings
 - **Anthropic Claude** (`claude-sonnet-5` by default) for reading generation
-- **astronomy-engine** — a pure-JavaScript ephemeris (no native deps, Vercel-safe)
+- **Swiss Ephemeris** via **sweph-wasm** (Moshier mode) — the astrologer's gold-standard ephemeris, compiled to WebAssembly, no native deps or data files
 - **Vercel**-ready
 
 ## ✦ How it works
@@ -130,12 +130,41 @@ reading. Edit it there to retune tone or structure.
 
 ## ✦ On the astronomy
 
-`astronomy-engine` gives geocentric positions in a high-precision modern model;
-we apply a precession correction to the tropical zodiac of date, the frame
-astrologers work in. Houses use an equal-house system from a properly computed
-Ascendant/Midheaven (sidereal-time + obliquity + latitude). For an even more
-traditional pipeline, `src/lib/astrology.ts` is the single seam to swap in
-Swiss Ephemeris — the rest of the app is unchanged.
+Charts are cast with the **Swiss Ephemeris** — the same library professional
+astrologers rely on — via `sweph-wasm`, a WebAssembly build. We run it in
+**Moshier mode** (`SEFLG_MOSEPH`): Swiss Ephemeris's built-in analytical model,
+which is arcsecond-accurate and **needs none of the external `.se1` data
+files**, so the app deploys to Vercel's serverless runtime with no native
+compilation and no multi-hundred-megabyte database to ship. Positions are true
+geocentric apparent longitudes in the tropical zodiac of date; houses are
+**Placidus** (with a whole-sign fallback at extreme latitudes) computed from the
+Swiss `swe_houses` Ascendant/Midheaven.
+
+The WASM module is instantiated from its binary bytes (read via `fs`), which
+sidesteps the Emscripten `fetch` loader that doesn't work under Node. Two Next
+settings make this production-safe (see `next.config.mjs`): `sweph-wasm` is a
+`serverExternalPackage`, and `outputFileTracingIncludes` bundles the `.wasm`
+binary into the function while `outputFileTracingExcludes` keeps the unused
+`ephe/` data files out.
+
+### Running in full Swiss mode (optional, maximum precision)
+
+Moshier is already excellent. To run in full Swiss mode against the JPL-derived
+`.se1` **sources** for sub-arcsecond precision:
+
+1. Obtain the Swiss data files (`sepl_18.se1`, `semo_18.se1`, `seas_18.se1`
+   cover 1800–2400 AD; from [astro.com/ftp/swisseph/ephe](https://www.astro.com/ftp/swisseph/ephe/)).
+   `sweph-wasm` also ships them under `node_modules/sweph-wasm/dist/ephe/`.
+2. Point the engine at them and drop the Moshier flag in
+   [`src/lib/astrology.ts`](src/lib/astrology.ts):
+   ```ts
+   await swe.swe_set_ephe_path("/path/to/ephe");     // or the bundled ephe dir
+   const iflag = swe.SEFLG_SWIEPH | swe.SEFLG_SPEED; // instead of SEFLG_MOSEPH
+   ```
+3. Bundle the chosen `.se1` files into the function (add them to
+   `outputFileTracingIncludes` and remove the `ephe/**` exclude).
+
+`src/lib/astrology.ts` is the single seam — the rest of the app is unchanged.
 
 ## ✦ The logo
 
