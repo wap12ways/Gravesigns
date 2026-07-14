@@ -45,7 +45,7 @@ export function ReadingDisplay({ data }: { data: ReadingResponse }) {
           <div className="mb-4 text-xs uppercase tracking-[0.14em] text-foreground/60">
             The Calculated Sky
           </div>
-          <ChartPanel chart={data.chart} />
+          <ChartPanel chart={data.chart} natalChart={data.natalChart} />
 
           <p className="mt-6 text-[11px] text-muted-foreground/60">
             Positions computed with {data.chart.ephemeris}. Tropical zodiac; Placidus

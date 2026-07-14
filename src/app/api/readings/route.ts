@@ -111,6 +111,44 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // 1b) Optionally calculate the natal chart from birth details. Never blocks
+  //     the reading — any failure simply omits the natal (Tier-2) depth.
+  const birthDate = body.birthDate?.trim() || null;
+  const birthTime = body.birthTime?.trim() || null;
+  const birthPlace = body.birthPlace?.trim() || null;
+  let natalChart: Awaited<ReturnType<typeof computeDeathChart>> | null = null;
+  if (birthDate && /^\d{4}-\d{2}-\d{2}$/.test(birthDate)) {
+    let bLat = typeof body.birthLatitude === "number" ? body.birthLatitude : null;
+    let bLon = typeof body.birthLongitude === "number" ? body.birthLongitude : null;
+    let bTz: string | null = body.birthTimezone?.trim() || null;
+    if (bTz) {
+      try {
+        new Intl.DateTimeFormat("en-US", { timeZone: bTz });
+      } catch {
+        bTz = null;
+      }
+    }
+    if ((bLat === null || bLon === null) && birthPlace && birthTime) {
+      const geo = await geocode(birthPlace);
+      if (geo) {
+        bLat = geo.lat;
+        bLon = geo.lon;
+      }
+    }
+    try {
+      natalChart = await computeDeathChart({
+        dateOfDeath: birthDate,
+        timeOfDeath: birthTime,
+        latitude: bLat,
+        longitude: bLon,
+        timezone: bTz,
+      });
+    } catch (err) {
+      console.error("Natal chart calculation failed (continuing without it):", err);
+      natalChart = null;
+    }
+  }
+
   // 2) Generate the reading through the three-pass pipeline
   //    (Step-0 analysis → judgment → composition → verification).
   let reading: string;
@@ -124,6 +162,8 @@ export async function POST(req: NextRequest) {
       place,
       notes,
       chart,
+      natalChart,
+      birthDate,
     });
     reading = result.reading;
     dossier = result.dossier;
@@ -150,6 +190,7 @@ export async function POST(req: NextRequest) {
     readingMarkdown: reading,
     model: READING_MODEL,
     dossier,
+    natalChart,
   });
 
   const response: ReadingResponse = {
@@ -165,6 +206,7 @@ export async function POST(req: NextRequest) {
     reading,
     model: READING_MODEL,
     dossier,
+    natalChart,
     persisted: Boolean(id),
   };
 

@@ -24,7 +24,9 @@ import type {
   VerificationReport,
 } from "./types";
 import { computeChartAnalysis } from "./analysis";
-import { analysisToText } from "./analysis/serialize";
+import { analysisToText, natalContextToText } from "./analysis/serialize";
+import { computeLifespan } from "./analysis/lifespan";
+import { computeCrossAspects } from "./analysis/synastry";
 
 export const READING_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
 
@@ -36,6 +38,9 @@ export interface PipelineArgs {
   place?: string | null;
   notes?: string | null;
   chart: DeathChart;
+  /** Optional nativity — unlocks the length-of-life doctrine and cross-aspects */
+  natalChart?: DeathChart | null;
+  birthDate?: string | null;
 }
 
 export interface PipelineResult {
@@ -76,7 +81,8 @@ RULES OF THIS PASS
 - Weight by real astrological strength: dignity, angularity, tightness of orb, concordance across independent testimonies, and whether the factor depends on a birth time that may be missing.
 - Prefer testimonies that CONCUR. When three independent factors point at the same theme, say so via concordance.
 - Be honest about limits. If houses/angles are absent, down-weight or suppress house-dependent and length-of-life techniques and record them in suppressed_techniques.
-- ABSOLUTELY FORBIDDEN: stating or implying a cause of death, a manner of death, a specific date, or a lifespan/length of life. This is a chart of a moment that already happened; you illuminate its meaning, you do not diagnose or predict. Flag any factor that tempts such a claim as indeterminate and steer its direction toward meaning, not mechanism.
+- ABSOLUTELY FORBIDDEN: stating or implying a cause of death, a manner of death, a specific date, or any PREDICTION. This is a chart of a moment that already happened; you illuminate its meaning, you do not diagnose or predict. Flag any factor that tempts such a claim as indeterminate and steer its direction toward meaning, not mechanism.
+- If the brief contains the length-of-life doctrine (hyleg/alcocoden), you MAY record it DESCRIPTIVELY — as a classical technique read beside a life already complete, with the actual age noted for comparison. Never present it as having predicted or caused the death, and never extend it into a counterfactual.
 - Cite sources at the level the brief allows (e.g. "essential dignity — Lilly", "Lot of Death — Paulus", "fixed star Algol — Robson").
 
 Call record_judgment exactly once with the full dossier.`;
@@ -223,15 +229,38 @@ A brief, luminous closing to the deceased and to those who grieve. Two to four s
 
 Return only the reading in Markdown — no preamble, no meta-commentary, no mention of dossiers or being an AI.`;
 
+const TIER2_ADDENDUM = `
+
+A nativity was supplied, so the evidence brief includes a NATAL CHART, the
+length-of-life doctrine, and the cross-aspects of the death-moment sky over the
+birth chart. After "## The Weave of Aspects", add these three sections before
+"## Gifts Carried Forward":
+
+## The Life That Was
+The nativity's essential signature — who this soul was by the promise of their
+birth sky. Draw on the natal placements and dignities.
+
+## The Arc of Years
+Read the traditional length-of-life doctrine (hyleg, alcocoden, the giver of
+years) DESCRIPTIVELY and tenderly, as an old craft laid beside a life already
+complete. You may name the actual age beside the doctrine's indication as a
+quiet reflection. Never frame it as prediction, and never suggest the chart
+"caused" or "foretold" the death or its manner.
+
+## The Return
+The cross-aspects — how the sky at the crossing answered the natal promise,
+especially the slow, karmic bodies returning to the places of birth.`;
+
 async function runComposition(
   args: PipelineArgs,
   brief: string,
-  dossier: JudgmentDossier
+  dossier: JudgmentDossier,
+  hasNatal: boolean
 ): Promise<string> {
   const stream = client().messages.stream({
     model: READING_MODEL,
-    max_tokens: 4096,
-    system: COMPOSITION_SYSTEM,
+    max_tokens: 4608,
+    system: COMPOSITION_SYSTEM + (hasNatal ? TIER2_ADDENDUM : ""),
     messages: [
       {
         role: "user",
@@ -348,7 +377,19 @@ async function runRevision(
 
 export async function runReadingPipeline(args: PipelineArgs): Promise<PipelineResult> {
   const analysis = computeChartAnalysis(args.chart);
-  const brief = analysisToText(args.chart, analysis);
+  let brief = analysisToText(args.chart, analysis);
+
+  // When a nativity was supplied, append the natal context: the birth chart's
+  // own testimony, the length-of-life doctrine (descriptive), and the
+  // death-moment cross-aspects.
+  const hasNatal = !!args.natalChart && !!args.birthDate;
+  if (hasNatal) {
+    const natal = args.natalChart!;
+    const natalAnalysis = computeChartAnalysis(natal);
+    const lifespan = computeLifespan(natal, args.birthDate!, args.dateOfDeath);
+    const cross = computeCrossAspects(natal, args.chart);
+    brief += "\n\n" + natalContextToText(natal, natalAnalysis, lifespan, cross);
+  }
 
   // Pass A — Judgment. If it fails, the composer still gets the raw brief.
   let dossier: JudgmentDossier | null = null;
@@ -361,7 +402,7 @@ export async function runReadingPipeline(args: PipelineArgs): Promise<PipelineRe
   // Pass B — Composition.
   const composeDossier: JudgmentDossier =
     dossier ?? { primary_themes: [], factors: [], suppressed_techniques: [], limits: "" };
-  let reading = await runComposition(args, brief, composeDossier);
+  let reading = await runComposition(args, brief, composeDossier, hasNatal);
 
   // Pass C — Verification (+ one revision if it fails). Never blocks delivery.
   let verification: VerificationReport | null = null;

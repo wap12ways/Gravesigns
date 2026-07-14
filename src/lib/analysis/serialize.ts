@@ -6,6 +6,8 @@
  */
 import type { DeathChart } from "../types";
 import type { ChartAnalysis } from "./index";
+import type { LifespanAnalysis } from "./lifespan";
+import type { CrossAspect } from "./synastry";
 
 function deg(x: number): string {
   const d = Math.floor(x);
@@ -115,6 +117,67 @@ export function analysisToText(chart: DeathChart, a: ChartAnalysis): string {
   if (a.death.maleficContacts.length) {
     S.push("\nHard malefic contacts:");
     for (const c of a.death.maleficContacts) S.push(`  ${c.malefic} ${c.aspect} ${c.body} (orb ${c.orb}°)`);
+  }
+
+  return S.join("\n");
+}
+
+/**
+ * The natal-context brief, appended when birth details were supplied. Gives the
+ * judgment pass the nativity's own testimony, the length-of-life doctrine (framed
+ * descriptively — the death has happened), and the death-moment cross-aspects.
+ */
+export function natalContextToText(
+  natal: DeathChart,
+  natalAnalysis: ChartAnalysis,
+  lifespan: LifespanAnalysis,
+  cross: CrossAspect[]
+): string {
+  const S: string[] = [];
+  S.push("=== NATAL CHART (the nativity) ===");
+  S.push(chartHeader(natal));
+  S.push("\nNatal planets:");
+  for (const p of natal.planets) {
+    const h = p.house != null ? ` · house ${p.house}` : "";
+    S.push(`  ${p.name}: ${deg(p.degreeInSign)} ${p.sign}${h}${p.retrograde ? " · Rx" : ""}`);
+  }
+
+  // A couple of the strongest natal dignities, for character.
+  const topDign = [...natalAnalysis.dignities].sort((a, b) => b.total - a.total);
+  if (topDign.length) {
+    S.push("\nNatal dignity extremes:");
+    const strong = topDign[0], weak = topDign[topDign.length - 1];
+    S.push(`  strongest: ${strong.planet} in ${strong.sign} (${signed(strong.total)})`);
+    S.push(`  weakest: ${weak.planet} in ${weak.sign} (${signed(weak.total)})`);
+  }
+
+  S.push("\n=== LENGTH-OF-LIFE DOCTRINE (descriptive — the death has already occurred; NEVER predict) ===");
+  if (!lifespan.available) {
+    S.push(`(not derivable: ${lifespan.reason ?? "insufficient natal data"})`);
+    if (lifespan.actualAgeYears != null) S.push(`Actual age at death: ${lifespan.actualAgeYears} years.`);
+  } else {
+    S.push(`Sect: ${lifespan.sect}`);
+    S.push(`Hylegical candidates: ${lifespan.candidates.map((c) => `${c.name}${c.aphetic ? " (aphetic)" : ""}`).join(", ")}`);
+    if (lifespan.hyleg) S.push(`Hyleg (giver of life): ${lifespan.hyleg.name}${lifespan.hyleg.house != null ? ` in house ${lifespan.hyleg.house}` : ""}`);
+    if (lifespan.alcocoden) {
+      S.push(`Alcocoden (giver of years): ${lifespan.alcocoden.planet}${lifespan.alcocoden.house != null ? ` in house ${lifespan.alcocoden.house}` : ""} — condition ${lifespan.condition}`);
+    }
+    if (lifespan.yearRange) {
+      S.push(`Alcocoden years — greater ${lifespan.yearRange.greater}, mean ${lifespan.yearRange.mean}, lesser ${lifespan.yearRange.lesser}; doctrine indicates ${lifespan.indicatedYears}.`);
+    }
+    if (lifespan.anaretaCandidates.length) S.push(`Anaretic (killing) candidates: ${lifespan.anaretaCandidates.join("; ")}`);
+    if (lifespan.actualAgeYears != null) {
+      S.push(`Actual age at death: ${lifespan.actualAgeYears} years — present this beside the doctrine as a reflective comparison, not a claim the technique "worked."`);
+    }
+  }
+
+  S.push("\n=== CROSS-ASPECTS AT THE CROSSING (death-moment sky over the nativity) ===");
+  if (cross.length) {
+    for (const c of cross.slice(0, 14)) {
+      S.push(`  ${c.transit} ${c.aspect} natal ${c.natal} (orb ${c.orb}°${c.weighty ? ", weighty" : ""}${c.hard ? ", hard" : ", soft"})`);
+    }
+  } else {
+    S.push("(no tight cross-aspects)");
   }
 
   return S.join("\n");

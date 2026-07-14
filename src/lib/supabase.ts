@@ -40,6 +40,8 @@ interface SaveArgs {
   model: string;
   /** The Pass-A judgment dossier (optional; requires the `dossier` column) */
   dossier?: JudgmentDossier | null;
+  /** The natal chart, when birth details were supplied (requires `natal_chart`) */
+  natalChart?: DeathChart | null;
 }
 
 /** Returns the new row's id, or null when Supabase is not configured. */
@@ -60,12 +62,16 @@ export async function saveReading(args: SaveArgs): Promise<string | null> {
     reading_markdown: args.readingMarkdown,
     model: args.model,
   };
-  const withExtras = { ...base, dossier: args.dossier ?? null };
+  const withExtras = {
+    ...base,
+    dossier: args.dossier ?? null,
+    natal_chart: args.natalChart ?? null,
+  };
 
-  // Try the full row first; if the `dossier` column doesn't exist yet on this
-  // database, fall back to the base row so a reading is never lost to a schema lag.
+  // Try the full row first; if the new columns don't exist yet on this database,
+  // fall back to the base row so a reading is never lost to a schema lag.
   let res = await supabase.from("readings").insert(withExtras).select("id").single();
-  if (res.error && /dossier|column/i.test(res.error.message)) {
+  if (res.error && /dossier|natal_chart|column/i.test(res.error.message)) {
     res = await supabase.from("readings").insert(base).select("id").single();
   }
   if (res.error) {

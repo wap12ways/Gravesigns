@@ -65,7 +65,16 @@ function despread(items: { name: string; lon: number }[], ref: number): Placed[]
   return sorted;
 }
 
-export function ChartWheel({ chart }: { chart: DeathChart }) {
+export function ChartWheel({
+  chart,
+  transits,
+  transitLabel,
+}: {
+  chart: DeathChart;
+  /** Optional second chart drawn as an inner ring (e.g. the death sky over a nativity) */
+  transits?: DeathChart | null;
+  transitLabel?: string;
+}) {
   const hasHouses = chart.houseCusps.length >= 13 && chart.ascendantLon != null;
   const ref = chart.ascendantLon ?? 0;
 
@@ -74,6 +83,12 @@ export function ChartWheel({ chart }: { chart: DeathChart }) {
     ref
   );
   const lonByName = new Map(chart.planets.map((p) => [p.name, p.longitude]));
+
+  const rTransit = R - 120;
+  const placedTransits = transits
+    ? despread(transits.planets.map((p) => ({ name: p.name, lon: p.longitude })), ref)
+    : [];
+  const transitLonByName = new Map((transits?.planets ?? []).map((p) => [p.name, p.longitude]));
 
   // Sign sectors
   const signSectors = SIGNS_ORDER.map((sign, i) => {
@@ -230,6 +245,33 @@ export function ChartWheel({ chart }: { chart: DeathChart }) {
           </g>
         );
       })}
+
+      {/* Transit ring (the death sky over a nativity) */}
+      {transits && (
+        <>
+          <circle cx={CX} cy={CY} r={rTransit + 14} fill="none" stroke="#a9b6d6" strokeOpacity={0.15} strokeWidth={0.6} strokeDasharray="2 3" />
+          {placedTransits.map((p) => {
+            const realLon = transitLonByName.get(p.name)!;
+            const tickO = toXY(realLon, ref, rTransit + 14);
+            const tickI = toXY(p.drawLon, ref, rTransit + 6);
+            const glyphPos = toXY(p.drawLon, ref, rTransit);
+            return (
+              <g key={`t-${p.name}`}>
+                <line x1={tickO.x} y1={tickO.y} x2={tickI.x} y2={tickI.y} stroke="#a9b6d6" strokeOpacity={0.3} strokeWidth={0.6} />
+                <text x={glyphPos.x} y={glyphPos.y} fill="#c7cfe6" fontSize={13} textAnchor="middle" dominantBaseline="central">
+                  {PLANET_GLYPH[p.name] ?? "✷"}
+                </text>
+              </g>
+            );
+          })}
+        </>
+      )}
+
+      {transits && transitLabel && (
+        <text x={CX} y={CY + 14} fill="#a9b6d6" fillOpacity={0.7} fontSize={8} textAnchor="middle">
+          {transitLabel}
+        </text>
+      )}
 
       <circle cx={CX} cy={CY} r={2} fill="#e9c46a" fillOpacity={0.5} />
     </svg>

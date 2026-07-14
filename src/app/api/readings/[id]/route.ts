@@ -27,6 +27,7 @@ export async function GET(
     reading: row.reading_markdown,
     model: row.model,
     dossier: row.dossier ?? null,
+    natalChart: row.natal_chart ?? null,
     persisted: true,
   };
   return NextResponse.json(response);

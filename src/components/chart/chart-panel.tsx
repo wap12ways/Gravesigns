@@ -3,25 +3,31 @@
 import { useMemo, useState } from "react";
 import type { DeathChart } from "@/lib/types";
 import { computeChartAnalysis } from "@/lib/analysis";
-import { ELEMENT_COLOR } from "@/lib/glyphs";
+import { computeCrossAspects } from "@/lib/analysis/synastry";
+import { ELEMENT_COLOR, PLANET_GLYPH, ASPECT_COLOR } from "@/lib/glyphs";
 import { ChartWheel } from "./chart-wheel";
 import { DignitiesTable } from "./dignities-table";
 import { Aspectarian } from "./aspectarian";
 import { MortalityPanel } from "./mortality-panel";
 import { MoonPhaseDisk } from "./moon-phase";
 
-type Tab = "wheel" | "dignities" | "aspects" | "mortality";
+type Tab = "wheel" | "dignities" | "aspects" | "mortality" | "return";
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: "wheel", label: "The Wheel" },
-  { id: "dignities", label: "Dignities" },
-  { id: "aspects", label: "Aspects" },
-  { id: "mortality", label: "Mortality" },
-];
-
-export function ChartPanel({ chart }: { chart: DeathChart }) {
+export function ChartPanel({ chart, natalChart }: { chart: DeathChart; natalChart?: DeathChart | null }) {
+  const hasNatal = !!natalChart;
+  const TABS: { id: Tab; label: string }[] = [
+    { id: "wheel", label: "The Wheel" },
+    { id: "dignities", label: "Dignities" },
+    { id: "aspects", label: "Aspects" },
+    { id: "mortality", label: "Mortality" },
+    ...(hasNatal ? [{ id: "return" as Tab, label: "Life & Return" }] : []),
+  ];
   const [tab, setTab] = useState<Tab>("wheel");
   const analysis = useMemo(() => computeChartAnalysis(chart), [chart]);
+  const cross = useMemo(
+    () => (natalChart ? computeCrossAspects(natalChart, chart) : []),
+    [natalChart, chart]
+  );
 
   const totalBodies = chart.planets.length;
   const elements = analysis.balance.elements;
@@ -92,6 +98,33 @@ export function ChartPanel({ chart }: { chart: DeathChart }) {
         )}
         {tab === "aspects" && <Aspectarian chart={chart} />}
         {tab === "mortality" && <MortalityPanel analysis={analysis} />}
+        {tab === "return" && natalChart && (
+          <div className="space-y-5">
+            <ChartWheel chart={natalChart} transits={chart} transitLabel="pale glyphs — the sky at the crossing" />
+            <p className="text-center text-[11px] text-muted-foreground/70">
+              The bi-wheel: the nativity within, the death-moment sky (pale) returning over it.
+            </p>
+            <div>
+              <div className="mb-2 text-[10px] uppercase tracking-[0.16em] text-gold/70">
+                The Return — cross-aspects at the crossing
+              </div>
+              {cross.length ? (
+                <div className="grid gap-1.5 sm:grid-cols-2">
+                  {cross.slice(0, 12).map((c, i) => (
+                    <div key={i} className="flex items-center gap-2 rounded-lg border border-white/5 bg-black/20 px-3 py-1.5 text-xs">
+                      <span className="text-gold-light">{PLANET_GLYPH[c.transit] ?? c.transit}</span>
+                      <span style={{ color: ASPECT_COLOR[c.aspect] ?? "#8a83a6" }}>{c.aspect}</span>
+                      <span className="text-foreground/70">natal {PLANET_GLYPH[c.natal] ?? c.natal}</span>
+                      <span className="ml-auto text-muted-foreground/60">{c.orb}°{c.weighty ? " ★" : ""}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">No tight cross-aspects.</p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

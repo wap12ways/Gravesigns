@@ -20,6 +20,18 @@ export interface ReadingRequest {
   timezone?: string | null;
   /** Personality traits, cultural background, special notes — optional */
   notes?: string | null;
+
+  // ── Optional birth details ──────────────────────────────────────────────
+  // When supplied, a natal chart is cast and the reading gains the traditional
+  // length-of-life doctrine, the natal-to-death cross-aspects, and a bi-wheel.
+  /** ISO date string, YYYY-MM-DD */
+  birthDate?: string | null;
+  /** HH:MM (24h) */
+  birthTime?: string | null;
+  birthPlace?: string | null;
+  birthLatitude?: number | null;
+  birthLongitude?: number | null;
+  birthTimezone?: string | null;
 }
 
 /** A single planetary placement in the death chart */
@@ -134,6 +146,7 @@ export interface Reading {
   chart: DeathChart;
   reading_markdown: string;
   dossier?: JudgmentDossier | null;
+  natal_chart?: DeathChart | null;
   model: string;
 }
 
@@ -152,6 +165,8 @@ export interface ReadingResponse {
   model: string;
   /** The Pass-A judgment dossier, when the pipeline produced one */
   dossier?: JudgmentDossier | null;
+  /** The natal chart, when birth details were supplied */
+  natalChart?: DeathChart | null;
   /** true when saved to Supabase; false in demo/unconfigured mode */
   persisted: boolean;
 }
