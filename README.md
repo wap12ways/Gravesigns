@@ -23,7 +23,9 @@ transition.
 - **Tailwind CSS** + **shadcn/ui**-style components
 - **Supabase** (Postgres) for storing readings
 - **Anthropic Claude** (`claude-sonnet-5` by default) for reading generation
-- **Swiss Ephemeris** via **sweph-wasm** (Moshier mode) — the astrologer's gold-standard ephemeris, compiled to WebAssembly, no native deps or data files
+- **Swiss Ephemeris** via **sweph-wasm** — the astrologer's gold-standard ephemeris (full DE431 `.se1` data files), compiled to WebAssembly, no native deps
+- Proper **time-zone resolution** (`tz-lookup` + `luxon`) with DST/historical rules
+- Premium form UX: a **searchable time-zone combobox** with live GMT-offset badges and a **place autocomplete** that pins exact coordinates
 - **Vercel**-ready
 
 ## ✦ How it works

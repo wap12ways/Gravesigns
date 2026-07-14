@@ -1,16 +1,33 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { Sparkles, Loader2, User, PawPrint } from "lucide-react";
+import { Sparkles, Loader2, User, PawPrint, Globe } from "lucide-react";
 import type { ReadingResponse, SubjectType } from "@/lib/types";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { Label } from "./ui/label";
-import { NativeSelect } from "./ui/native-select";
+import { Combobox, type ComboOption } from "./ui/combobox";
 import { Card, CardContent } from "./ui/card";
+import { PlaceAutocomplete } from "./place-autocomplete";
 import { ReadingDisplay } from "./reading-display";
 import { cn } from "@/lib/utils";
+
+/** GMT offset label for a zone on a given date (accounts for DST). */
+function offsetHint(zone: string, dateStr: string): string {
+  try {
+    const when = new Date(
+      (dateStr || new Date().toISOString().slice(0, 10)) + "T12:00:00Z"
+    );
+    const dtf = new Intl.DateTimeFormat("en-US", {
+      timeZone: zone,
+      timeZoneName: "shortOffset",
+    } as Intl.DateTimeFormatOptions);
+    return dtf.formatToParts(when).find((p) => p.type === "timeZoneName")?.value ?? "";
+  } catch {
+    return "";
+  }
+}
 
 /** Full IANA zone list from the browser, with a small fallback. */
 function listTimeZones(): string[] {
@@ -44,9 +61,26 @@ export function ReadingForm() {
   const [dateOfDeath, setDateOfDeath] = useState("");
   const [timeOfDeath, setTimeOfDeath] = useState("");
   const [place, setPlace] = useState("");
+  const [placeCoords, setPlaceCoords] = useState<{ lat: number; lon: number } | null>(
+    null
+  );
   const [timezone, setTimezone] = useState(""); // "" = detect from place
   const [notes, setNotes] = useState("");
   const zones = useMemo(() => listTimeZones(), []);
+
+  const tzOptions = useMemo<ComboOption[]>(() => {
+    const detect: ComboOption = {
+      value: "",
+      label: "Detect from place of death",
+      icon: <Globe className="h-4 w-4 text-gold/60" />,
+    };
+    const rest = zones.map<ComboOption>((z) => ({
+      value: z,
+      label: z.replace(/_/g, " "),
+      hint: offsetHint(z, dateOfDeath),
+    }));
+    return [detect, ...rest];
+  }, [zones, dateOfDeath]);
 
   const [loading, setLoading] = useState(false);
   const [loadingLine, setLoadingLine] = useState(0);
@@ -84,6 +118,8 @@ export function ReadingForm() {
           dateOfDeath,
           timeOfDeath: timeOfDeath || null,
           place: place.trim() || null,
+          latitude: placeCoords?.lat ?? null,
+          longitude: placeCoords?.lon ?? null,
           type,
           timezone: timeOfDeath && timezone ? timezone : null,
           notes: notes.trim() || null,
@@ -172,33 +208,43 @@ export function ReadingForm() {
 
             <div className="space-y-2">
               <Label htmlFor="place">Place of death (optional)</Label>
-              <Input
+              <PlaceAutocomplete
                 id="place"
                 value={place}
-                onChange={(e) => setPlace(e.target.value)}
-                placeholder="City, Country"
-                autoComplete="off"
+                onChange={(t) => {
+                  setPlace(t);
+                  setPlaceCoords(null);
+                }}
+                onResolve={(label, lat, lon) => {
+                  setPlace(label);
+                  setPlaceCoords({ lat, lon });
+                }}
+                placeholder="Start typing a city…"
               />
               <p className="text-[11px] text-muted-foreground/70">
-                A place and time together unlock the houses and rising sign.
+                {placeCoords ? (
+                  <span className="text-gold-light/80">
+                    ✓ Pinned to {placeCoords.lat.toFixed(2)}°,{" "}
+                    {placeCoords.lon.toFixed(2)}° — houses and rising sign unlocked.
+                  </span>
+                ) : (
+                  "A place and time together unlock the houses and rising sign."
+                )}
               </p>
             </div>
 
             {timeOfDeath && (
               <div className="space-y-2 animate-fade-up">
                 <Label htmlFor="timezone">Time zone</Label>
-                <NativeSelect
-                  id="timezone"
+                <Combobox
+                  ariaLabel="Time zone"
                   value={timezone}
-                  onChange={(e) => setTimezone(e.target.value)}
-                >
-                  <option value="">Detect from place of death</option>
-                  {zones.map((z) => (
-                    <option key={z} value={z}>
-                      {z.replace(/_/g, " ")}
-                    </option>
-                  ))}
-                </NativeSelect>
+                  options={tzOptions}
+                  onSelect={(v) => setTimezone(v)}
+                  placeholder="Detect from place of death"
+                  searchPlaceholder="Search time zones…"
+                  emptyText="No matching time zone"
+                />
                 <p className="text-[11px] text-muted-foreground/70">
                   Leave on &ldquo;Detect from place&rdquo; unless you know the
                   civil time zone at the moment of passing. Daylight saving is
