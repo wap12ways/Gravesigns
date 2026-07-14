@@ -133,6 +133,7 @@ export interface Reading {
   notes: string | null;
   chart: DeathChart;
   reading_markdown: string;
+  dossier?: JudgmentDossier | null;
   model: string;
 }
 
