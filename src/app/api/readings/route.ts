@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { computeDeathChart } from "@/lib/astrology";
-import { generateReading, READING_MODEL } from "@/lib/anthropic";
+import { runReadingPipeline, READING_MODEL } from "@/lib/pipeline";
 import { saveReading, listReadings, isSupabaseConfigured } from "@/lib/supabase";
-import type { ReadingRequest, ReadingResponse, SubjectType } from "@/lib/types";
+import type {
+  JudgmentDossier,
+  ReadingRequest,
+  ReadingResponse,
+  SubjectType,
+} from "@/lib/types";
 
 // Reading generation streams from Claude and can run longer than the default
 // serverless budget; give it room. (On Vercel Hobby the effective cap is 60s.)
@@ -106,10 +111,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 2) Generate the reading with Claude.
+  // 2) Generate the reading through the three-pass pipeline
+  //    (Step-0 analysis → judgment → composition → verification).
   let reading: string;
+  let dossier: JudgmentDossier | null = null;
   try {
-    reading = await generateReading({
+    const result = await runReadingPipeline({
       fullName,
       subjectType: type,
       dateOfDeath,
@@ -118,6 +125,8 @@ export async function POST(req: NextRequest) {
       notes,
       chart,
     });
+    reading = result.reading;
+    dossier = result.dossier;
   } catch (err) {
     console.error("Reading generation failed:", err);
     const message =
@@ -140,6 +149,7 @@ export async function POST(req: NextRequest) {
     chart,
     readingMarkdown: reading,
     model: READING_MODEL,
+    dossier,
   });
 
   const response: ReadingResponse = {
@@ -154,6 +164,7 @@ export async function POST(req: NextRequest) {
     chart,
     reading,
     model: READING_MODEL,
+    dossier,
     persisted: Boolean(id),
   };
 

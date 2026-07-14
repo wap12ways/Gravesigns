@@ -42,9 +42,11 @@ const MODALITIES: Record<string, string> = {
 
 const ASPECT_DEFS: { name: string; angle: number; orb: number }[] = [
   { name: "Conjunction", angle: 0, orb: 8 },
+  { name: "Semisextile", angle: 30, orb: 2 },
   { name: "Sextile", angle: 60, orb: 5 },
   { name: "Square", angle: 90, orb: 7 },
   { name: "Trine", angle: 120, orb: 7 },
+  { name: "Quincunx", angle: 150, orb: 3 },
   { name: "Opposition", angle: 180, orb: 8 },
 ];
 
@@ -294,6 +296,7 @@ export async function computeDeathChart(params: {
       degreeInSign,
       house: cusps ? houseFromCusps(lon, cusps) : null,
       retrograde: speed < 0,
+      speed,
     };
   });
 
@@ -337,6 +340,11 @@ export async function computeDeathChart(params: {
   const sun = planets.find((p) => p.name === "Sun")!;
   const moon = planets.find((p) => p.name === "Moon")!;
 
+  // Sect: day when the Sun is above the horizon (houses 7–12). Falls back to a
+  // diurnal default when no houses are available (no location/time).
+  const sect: "day" | "night" =
+    sun.house != null ? (sun.house >= 7 && sun.house <= 12 ? "day" : "night") : "day";
+
   const ephemeris = !epheLoaded
     ? "Swiss Ephemeris · Moshier model"
     : usedMoshierFallback
@@ -353,6 +361,10 @@ export async function computeDeathChart(params: {
     longitude: typeof longitude === "number" ? longitude : null,
     ascendant: ascLon !== null ? signFromLongitude(ascLon) : null,
     midheaven: mcLon !== null ? signFromLongitude(mcLon) : null,
+    ascendantLon: ascLon,
+    midheavenLon: mcLon,
+    houseCusps: cusps ?? [],
+    sect,
     planets,
     aspects,
     dominantElement,

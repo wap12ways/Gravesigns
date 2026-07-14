@@ -22,11 +22,17 @@ create table if not exists public.readings (
 
   chart             jsonb not null,        -- the full calculated DeathChart
   reading_markdown  text not null,         -- the AI-composed reading
+  dossier           jsonb,                 -- the Pass-A judgment dossier (nullable)
   model             text not null default 'claude-sonnet-5'
 );
 
 create index if not exists readings_created_at_idx
   on public.readings (created_at desc);
+
+-- ── Migration for existing databases ─────────────────────────
+-- If your `readings` table predates the three-pass pipeline, add the
+-- dossier column (safe to run repeatedly):
+alter table public.readings add column if not exists dossier jsonb;
 
 -- ── Row Level Security ───────────────────────────────────────
 -- The API routes use the SERVICE ROLE key, which bypasses RLS, so
