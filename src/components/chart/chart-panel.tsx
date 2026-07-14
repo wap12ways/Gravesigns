@@ -10,13 +10,16 @@ import { DignitiesTable } from "./dignities-table";
 import { Aspectarian } from "./aspectarian";
 import { MortalityPanel } from "./mortality-panel";
 import { MoonPhaseDisk } from "./moon-phase";
+import { SkyDome } from "./sky-dome";
 
-type Tab = "wheel" | "dignities" | "aspects" | "mortality" | "return";
+type Tab = "wheel" | "sky" | "dignities" | "aspects" | "mortality" | "return";
 
 export function ChartPanel({ chart, natalChart }: { chart: DeathChart; natalChart?: DeathChart | null }) {
   const hasNatal = !!natalChart;
+  const hasSky = chart.locationKnown && chart.latitude != null && chart.longitude != null;
   const TABS: { id: Tab; label: string }[] = [
     { id: "wheel", label: "The Wheel" },
+    ...(hasSky ? [{ id: "sky" as Tab, label: "The Sky" }] : []),
     { id: "dignities", label: "Dignities" },
     { id: "aspects", label: "Aspects" },
     { id: "mortality", label: "Mortality" },
@@ -90,6 +93,15 @@ export function ChartPanel({ chart, natalChart }: { chart: DeathChart; natalChar
             <p className="text-center text-[11px] text-muted-foreground/70">
               Tropical zodiac · Placidus houses · Ascendant fixed to the left. Hard aspects
               solid, soft and minor aspects dashed.
+            </p>
+          </div>
+        )}
+        {tab === "sky" && (
+          <div className="space-y-2">
+            <SkyDome chart={chart} />
+            <p className="text-center text-[11px] text-muted-foreground/70">
+              The visible hemisphere at the moment of crossing — zenith at the centre,
+              horizon at the rim, looking upward.
             </p>
           </div>
         )}

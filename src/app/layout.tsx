@@ -35,9 +35,11 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${serif.variable} ${sans.variable} dark`}>
       <body className="min-h-screen">
-        <SiteHeader />
+        <div className="no-print">
+          <SiteHeader />
+        </div>
         <main>{children}</main>
-        <footer className="mt-24 border-t border-white/5 py-10">
+        <footer className="no-print mt-24 border-t border-white/5 py-10">
           <div className="container flex flex-col items-center gap-2 text-center text-sm text-muted-foreground">
             <p className="gold-text font-serif text-lg">GraveSigns</p>
             <p className="max-w-md text-xs leading-relaxed">

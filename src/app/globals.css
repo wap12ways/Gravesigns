@@ -106,3 +106,66 @@
   background: hsl(var(--border));
   border-radius: 6px;
 }
+
+/* ── Print / PDF keepsake ─────────────────────────────────────
+   On screen the print-only title block is hidden; in print we hide the
+   app chrome and interactive panels and render a gentle, ink-light page
+   so families can save the reading itself as a keepsake PDF. */
+.print-only {
+  display: none;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block;
+  }
+  html,
+  body {
+    background: #fbf9f4 !important;
+    color: #241f17 !important;
+  }
+  main {
+    margin: 0 !important;
+  }
+  .print-keepsake,
+  .print-keepsake > * {
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+  .print-keepsake {
+    max-width: 44rem;
+    margin: 0 auto;
+  }
+  .reading-prose,
+  .reading-prose p,
+  .reading-prose li,
+  .print-keepsake h1,
+  .print-keepsake p {
+    color: #241f17 !important;
+  }
+  .reading-prose h2 {
+    color: #7a5c1a !important;
+  }
+  .reading-prose h3,
+  .reading-prose strong,
+  .print-keepsake .text-gold\/70 {
+    color: #9a7420 !important;
+  }
+  .reading-prose em {
+    color: #4a4436 !important;
+  }
+  .reading-prose hr {
+    background: #d8cba8 !important;
+  }
+  .reading-prose blockquote {
+    border-left-color: #c9a227 !important;
+    color: #4a4436 !important;
+  }
+  @page {
+    margin: 1.6cm;
+  }
+}
