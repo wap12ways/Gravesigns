@@ -31,21 +31,31 @@ transition.
 ## ✦ How it works
 
 ```
-Form (name, date, optional time/place, human|pet, notes)
+Form (name, date, optional time/place, optional birth details, human|pet, notes)
         │
         ▼
 POST /api/readings
-   1. Geocode the place (keyless Open-Meteo) when a time is also given
-   2. computeDeathChart()  ──►  real positions, houses, aspects, Moon phase
-   3. generateReading()    ──►  Claude composes the reading from the chart
-   4. saveReading()        ──►  Supabase (no-op in demo mode)
+   1. Geocode place(s) (keyless Open-Meteo) when a time is also given
+   2. computeDeathChart()      ──►  real positions, houses, aspects, Moon phase,
+                                    sect, cusps, speeds  (Swiss Ephemeris DE431)
+   3. [optional] natal chart from birth details
+   4. runReadingPipeline():
+        Step 0  computeChartAnalysis()  — deterministic: dignities, Arabic lots,
+                aspect patterns, chart shape, fixed stars, the 8th/4th/12th
+                complex, mortal significators; + lifespan & cross-aspects if natal
+        Pass A  Judgment      — Sonnet distils a weighted, sourced dossier (JSON)
+        Pass B  Composition   — Sonnet composes the reading from the dossier
+        Pass C  Verification  — Sonnet audits it; one revision if it fails
+   5. saveReading()            ──►  Supabase (no-op in demo mode)
         │
         ▼
-Elegant chart summary + the composed reading
+Interactive chart wheel + tables + the composed reading + the astrologer's casebook
 ```
 
 Only a **name** and **date of death** are required. Supplying a **time** and
 **place** together unlocks the Ascendant, Midheaven, and house placements.
+Supplying **birth details** casts the nativity too and adds the traditional
+length-of-life reading, the death-moment cross-aspects, and a bi-wheel.
 
 ## ✦ Project structure
 
@@ -63,13 +73,25 @@ src/
 │       └── [id]/route.ts          # GET one reading
 ├── components/
 │   ├── reading-form.tsx           # the interactive form (client)
-│   ├── reading-display.tsx        # chart + reading renderer
-│   ├── chart-summary.tsx          # planet grid, aspects, angles
+│   ├── reading-display.tsx        # chart panel + reading + casebook
+│   ├── chart/                     # the visual layer
+│   │   ├── chart-panel.tsx        # tabbed orchestrator (client)
+│   │   ├── chart-wheel.tsx        # SVG wheel + bi-wheel
+│   │   ├── dignities-table.tsx / aspectarian.tsx / mortality-panel.tsx
+│   │   ├── moon-phase.tsx / dossier-notes.tsx
 │   ├── logo.tsx / starfield.tsx / site-header.tsx
 │   └── ui/                        # button, input, textarea, label, card
 └── lib/
     ├── astrology.ts               # ephemeris → DeathChart
-    ├── anthropic.ts               # system prompt + reading generation
+    ├── pipeline.ts                # the three-pass reading pipeline
+    ├── analysis/                  # Step-0 deterministic engine
+    │   ├── reference.ts           # source-verified traditional tables
+    │   ├── dignities.ts / lots.ts / patterns.ts / fixedstars.ts
+    │   ├── deathfactors.ts        # 8th/4th/12th complex, significators
+    │   ├── lifespan.ts / synastry.ts   # natal (Tier-2) doctrine
+    │   ├── serialize.ts           # analysis → evidence brief
+    │   └── index.ts               # computeChartAnalysis()
+    ├── glyphs.ts                  # shared glyphs + element palette
     ├── supabase.ts                # persistence (graceful demo fallback)
     ├── markdown.ts                # tiny, safe MD → HTML
     └── types.ts
@@ -119,16 +141,18 @@ production.
    settings.
 4. Deploy.
 
-`vercel.json` grants the reading route a 60s `maxDuration`. The reading route
-runs on the **Node.js runtime** (required by the ephemeris and the Anthropic
-SDK) and streams from Claude to avoid HTTP timeouts.
+The reading route requests a 300s `maxDuration` (honoured up to your Vercel
+plan's ceiling — 300s on Pro, capped to 60s on Hobby) because it runs three
+sequential Claude passes. It runs on the **Node.js runtime** (required by the
+ephemeris and the Anthropic SDK) and streams each pass to avoid HTTP timeouts.
 
 ## ✦ Customizing the reading voice
 
-The entire astrologer persona lives in `SYSTEM_PROMPT` in
-[`src/lib/anthropic.ts`](src/lib/anthropic.ts) — a reusable, structured prompt
-that specifies voice, technical integrity, and the eight-section shape of every
-reading. Edit it there to retune tone or structure.
+The three astrologer personas live in [`src/lib/pipeline.ts`](src/lib/pipeline.ts):
+`JUDGMENT_SYSTEM` (what evidence to weigh), `COMPOSITION_SYSTEM` (voice,
+integrity, and the section shape of every reading), and `VERIFY_SYSTEM` (the
+integrity audit). Edit them there to retune the craft. The deterministic
+astrology it all builds on lives in [`src/lib/analysis/`](src/lib/analysis).
 
 ## ✦ On the astronomy
 

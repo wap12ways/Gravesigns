@@ -51,10 +51,11 @@ function listTimeZones(): string[] {
 
 const LOADING_LINES = [
   "Casting the sky for the moment of crossing…",
-  "Placing the Moon, the soul's quiet vehicle…",
+  "Tabulating dignities, lots, and fixed stars…",
+  "Weighing each testimony the chart offers…",
   "Reading Saturn and Pluto at the threshold…",
-  "Tracing the aspects into a single pattern…",
   "Composing the reading with care…",
+  "Reviewing every line against the chart…",
 ];
 
 export function ReadingForm() {
@@ -68,6 +69,15 @@ export function ReadingForm() {
   );
   const [timezone, setTimezone] = useState(""); // "" = detect from place
   const [notes, setNotes] = useState("");
+
+  // Optional birth details — deepen the reading with a natal chart.
+  const [showBirth, setShowBirth] = useState(false);
+  const [birthDate, setBirthDate] = useState("");
+  const [birthTime, setBirthTime] = useState("");
+  const [birthPlace, setBirthPlace] = useState("");
+  const [birthCoords, setBirthCoords] = useState<{ lat: number; lon: number } | null>(null);
+  const [birthTimezone, setBirthTimezone] = useState("");
+
   const zones = useMemo(() => listTimeZones(), []);
 
   const tzOptions = useMemo<ComboOption[]>(() => {
@@ -125,6 +135,12 @@ export function ReadingForm() {
           type,
           timezone: timeOfDeath && timezone ? timezone : null,
           notes: notes.trim() || null,
+          birthDate: birthDate || null,
+          birthTime: birthTime || null,
+          birthPlace: birthPlace.trim() || null,
+          birthLatitude: birthCoords?.lat ?? null,
+          birthLongitude: birthCoords?.lon ?? null,
+          birthTimezone: birthTime && birthTimezone ? birthTimezone : null,
         }),
       });
 
@@ -260,6 +276,80 @@ export function ReadingForm() {
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Anything you'd like honored — their spirit, their faith or heritage, how they loved, how they left."
               />
+            </div>
+
+            {/* Optional birth details → natal chart depth */}
+            <div className="rounded-xl border border-white/8 bg-black/15">
+              <button
+                type="button"
+                onClick={() => setShowBirth((s) => !s)}
+                className="flex w-full items-center justify-between px-4 py-3 text-left"
+              >
+                <span className="flex items-center gap-2 text-sm text-foreground/85">
+                  <Sparkles className="h-4 w-4 text-gold/70" />
+                  Add birth details
+                  <span className="text-xs text-muted-foreground">— for a deeper reading</span>
+                </span>
+                <span className="text-gold/60">{showBirth ? "−" : "+"}</span>
+              </button>
+
+              {showBirth && (
+                <div className="space-y-5 border-t border-white/5 px-4 pb-5 pt-4 animate-fade-up">
+                  <p className="text-[11px] text-muted-foreground/80">
+                    When the birth is known, we cast the nativity too — unlocking the
+                    traditional length-of-life reading, the sky&rsquo;s return over the
+                    birth chart, and a bi-wheel. Every field is optional.
+                  </p>
+
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="birthDate">Date of birth</Label>
+                      <DatePicker id="birthDate" value={birthDate} onChange={setBirthDate} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="birthTime">Time of birth</Label>
+                      <TimePicker id="birthTime" value={birthTime} onChange={setBirthTime} />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="birthPlace">Place of birth</Label>
+                    <PlaceAutocomplete
+                      id="birthPlace"
+                      value={birthPlace}
+                      onChange={(t) => {
+                        setBirthPlace(t);
+                        setBirthCoords(null);
+                      }}
+                      onResolve={(label, lat, lon) => {
+                        setBirthPlace(label);
+                        setBirthCoords({ lat, lon });
+                      }}
+                      placeholder="Start typing a city…"
+                    />
+                    {birthCoords && (
+                      <p className="text-[11px] text-gold-light/80">
+                        ✓ Pinned to {birthCoords.lat.toFixed(2)}°, {birthCoords.lon.toFixed(2)}°.
+                      </p>
+                    )}
+                  </div>
+
+                  {birthTime && (
+                    <div className="space-y-2 animate-fade-up">
+                      <Label htmlFor="birthTimezone">Birth time zone</Label>
+                      <Combobox
+                        ariaLabel="Birth time zone"
+                        value={birthTimezone}
+                        options={tzOptions}
+                        onSelect={(v) => setBirthTimezone(v)}
+                        placeholder="Detect from place of birth"
+                        searchPlaceholder="Search time zones…"
+                        emptyText="No matching time zone"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {error && (

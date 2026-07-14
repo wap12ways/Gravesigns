@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import type { DeathChart, Reading, SubjectType } from "./types";
+import type { DeathChart, JudgmentDossier, Reading, SubjectType } from "./types";
 
 /**
  * Server-side Supabase access. We prefer the service-role key (server only,
@@ -38,6 +38,10 @@ interface SaveArgs {
   chart: DeathChart;
   readingMarkdown: string;
   model: string;
+  /** The Pass-A judgment dossier (optional; requires the `dossier` column) */
+  dossier?: JudgmentDossier | null;
+  /** The natal chart, when birth details were supplied (requires `natal_chart`) */
+  natalChart?: DeathChart | null;
 }
 
 /** Returns the new row's id, or null when Supabase is not configured. */
@@ -45,29 +49,36 @@ export async function saveReading(args: SaveArgs): Promise<string | null> {
   const supabase = getSupabase();
   if (!supabase) return null;
 
-  const { data, error } = await supabase
-    .from("readings")
-    .insert({
-      full_name: args.fullName,
-      subject_type: args.subjectType,
-      date_of_death: args.dateOfDeath,
-      time_of_death: args.timeOfDeath,
-      place: args.place,
-      latitude: args.latitude,
-      longitude: args.longitude,
-      notes: args.notes,
-      chart: args.chart,
-      reading_markdown: args.readingMarkdown,
-      model: args.model,
-    })
-    .select("id")
-    .single();
+  const base = {
+    full_name: args.fullName,
+    subject_type: args.subjectType,
+    date_of_death: args.dateOfDeath,
+    time_of_death: args.timeOfDeath,
+    place: args.place,
+    latitude: args.latitude,
+    longitude: args.longitude,
+    notes: args.notes,
+    chart: args.chart,
+    reading_markdown: args.readingMarkdown,
+    model: args.model,
+  };
+  const withExtras = {
+    ...base,
+    dossier: args.dossier ?? null,
+    natal_chart: args.natalChart ?? null,
+  };
 
-  if (error) {
-    console.error("Supabase saveReading error:", error.message);
+  // Try the full row first; if the new columns don't exist yet on this database,
+  // fall back to the base row so a reading is never lost to a schema lag.
+  let res = await supabase.from("readings").insert(withExtras).select("id").single();
+  if (res.error && /dossier|natal_chart|column/i.test(res.error.message)) {
+    res = await supabase.from("readings").insert(base).select("id").single();
+  }
+  if (res.error) {
+    console.error("Supabase saveReading error:", res.error.message);
     return null;
   }
-  return data?.id ?? null;
+  return res.data?.id ?? null;
 }
 
 export async function getReading(id: string): Promise<Reading | null> {

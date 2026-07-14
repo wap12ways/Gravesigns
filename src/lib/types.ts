@@ -20,6 +20,18 @@ export interface ReadingRequest {
   timezone?: string | null;
   /** Personality traits, cultural background, special notes — optional */
   notes?: string | null;
+
+  // ── Optional birth details ──────────────────────────────────────────────
+  // When supplied, a natal chart is cast and the reading gains the traditional
+  // length-of-life doctrine, the natal-to-death cross-aspects, and a bi-wheel.
+  /** ISO date string, YYYY-MM-DD */
+  birthDate?: string | null;
+  /** HH:MM (24h) */
+  birthTime?: string | null;
+  birthPlace?: string | null;
+  birthLatitude?: number | null;
+  birthLongitude?: number | null;
+  birthTimezone?: string | null;
 }
 
 /** A single planetary placement in the death chart */
@@ -33,6 +45,8 @@ export interface PlanetPosition {
   /** Whole house 1–12 (null when no birth time / location was supplied) */
   house: number | null;
   retrograde: boolean;
+  /** Ecliptic longitude speed (deg/day); negative = retrograde */
+  speed: number;
 }
 
 export interface Aspect {
@@ -54,6 +68,13 @@ export interface DeathChart {
   longitude: number | null;
   ascendant: { sign: string; degreeInSign: number } | null;
   midheaven: { sign: string; degreeInSign: number } | null;
+  /** Absolute ecliptic longitude of the Ascendant / MC (for chart rendering) */
+  ascendantLon: number | null;
+  midheavenLon: number | null;
+  /** House cusp longitudes; index 1–12 populated (0 unused), [] when no houses */
+  houseCusps: number[];
+  /** Chart sect: day if the Sun is above the horizon, else night */
+  sect: "day" | "night";
   planets: PlanetPosition[];
   aspects: Aspect[];
   /** The dominant element across the luminaries and personal planets */
@@ -64,6 +85,51 @@ export interface DeathChart {
   ephemeris: string;
   /** The IANA civil time zone used to resolve the moment to UTC, if known */
   timezone: string | null;
+}
+
+/**
+ * One weighted testimony produced by the AI judgment pass (Pass A). Each is a
+ * single, source-anchored piece of evidence — never a verdict about cause,
+ * manner, or lifespan.
+ */
+export interface JudgmentFactor {
+  /** The technical fact, e.g. "Saturn in the 8th, ruling the 8th cusp" */
+  factor: string;
+  /** Where the technique comes from, e.g. "Lilly CA p.653; Dorotheus III" */
+  source: string;
+  tradition_vs_modern: "traditional" | "modern" | "both";
+  /** 0–1 salience for the composition pass */
+  weight: number;
+  /** The felt/interpretive direction — comforting, heavy, ambivalent, etc. */
+  direction: string;
+  /** Caveats on strength (out of sign, wide orb, cadent, etc.) */
+  condition_notes: string;
+  /** True when the reading of this factor depends on a birth time we may lack */
+  birthtime_dependent: boolean;
+  /** Short interpretive tags the composer can weave, e.g. ["water","surrender"] */
+  theme_tokens: string[];
+  /** How many independent testimonies concur with this theme */
+  concordance: number;
+  confidence: number;
+  /** True when the data genuinely can't decide this */
+  indeterminate: boolean;
+}
+
+export interface JudgmentDossier {
+  /** The two or three overarching themes the testimonies converge on */
+  primary_themes: string[];
+  factors: JudgmentFactor[];
+  /** Techniques deliberately withheld (e.g. length-of-life without birth data) */
+  suppressed_techniques: string[];
+  /** One-line honest statement of what this chart cannot show */
+  limits: string;
+}
+
+/** What Pass C (verification) reports back about a drafted reading. */
+export interface VerificationReport {
+  approved: boolean;
+  /** Problems found: fabricated placements, forbidden claims, tone slips */
+  issues: string[];
 }
 
 export interface Reading {
@@ -79,6 +145,8 @@ export interface Reading {
   notes: string | null;
   chart: DeathChart;
   reading_markdown: string;
+  dossier?: JudgmentDossier | null;
+  natal_chart?: DeathChart | null;
   model: string;
 }
 
@@ -95,6 +163,10 @@ export interface ReadingResponse {
   chart: DeathChart;
   reading: string;
   model: string;
+  /** The Pass-A judgment dossier, when the pipeline produced one */
+  dossier?: JudgmentDossier | null;
+  /** The natal chart, when birth details were supplied */
+  natalChart?: DeathChart | null;
   /** true when saved to Supabase; false in demo/unconfigured mode */
   persisted: boolean;
 }

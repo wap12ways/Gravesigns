@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { computeDeathChart } from "@/lib/astrology";
-import { generateReading, READING_MODEL } from "@/lib/anthropic";
+import { runReadingPipeline, READING_MODEL } from "@/lib/pipeline";
 import { saveReading, listReadings, isSupabaseConfigured } from "@/lib/supabase";
-import type { ReadingRequest, ReadingResponse, SubjectType } from "@/lib/types";
+import type {
+  JudgmentDossier,
+  ReadingRequest,
+  ReadingResponse,
+  SubjectType,
+} from "@/lib/types";
 
-// Reading generation streams from Claude and can run longer than the default
-// serverless budget; give it room. (On Vercel Hobby the effective cap is 60s.)
-export const maxDuration = 60;
+// The reading now runs three sequential Claude passes (judgment → composition →
+// verification), so it needs real headroom. Vercel honours this up to the plan's
+// ceiling — 300s on Pro/Enterprise, capped to 60s on Hobby.
+export const maxDuration = 300;
 export const runtime = "nodejs";
 
 /**
@@ -106,10 +112,50 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 2) Generate the reading with Claude.
+  // 1b) Optionally calculate the natal chart from birth details. Never blocks
+  //     the reading — any failure simply omits the natal (Tier-2) depth.
+  const birthDate = body.birthDate?.trim() || null;
+  const birthTime = body.birthTime?.trim() || null;
+  const birthPlace = body.birthPlace?.trim() || null;
+  let natalChart: Awaited<ReturnType<typeof computeDeathChart>> | null = null;
+  if (birthDate && /^\d{4}-\d{2}-\d{2}$/.test(birthDate)) {
+    let bLat = typeof body.birthLatitude === "number" ? body.birthLatitude : null;
+    let bLon = typeof body.birthLongitude === "number" ? body.birthLongitude : null;
+    let bTz: string | null = body.birthTimezone?.trim() || null;
+    if (bTz) {
+      try {
+        new Intl.DateTimeFormat("en-US", { timeZone: bTz });
+      } catch {
+        bTz = null;
+      }
+    }
+    if ((bLat === null || bLon === null) && birthPlace && birthTime) {
+      const geo = await geocode(birthPlace);
+      if (geo) {
+        bLat = geo.lat;
+        bLon = geo.lon;
+      }
+    }
+    try {
+      natalChart = await computeDeathChart({
+        dateOfDeath: birthDate,
+        timeOfDeath: birthTime,
+        latitude: bLat,
+        longitude: bLon,
+        timezone: bTz,
+      });
+    } catch (err) {
+      console.error("Natal chart calculation failed (continuing without it):", err);
+      natalChart = null;
+    }
+  }
+
+  // 2) Generate the reading through the three-pass pipeline
+  //    (Step-0 analysis → judgment → composition → verification).
   let reading: string;
+  let dossier: JudgmentDossier | null = null;
   try {
-    reading = await generateReading({
+    const result = await runReadingPipeline({
       fullName,
       subjectType: type,
       dateOfDeath,
@@ -117,7 +163,11 @@ export async function POST(req: NextRequest) {
       place,
       notes,
       chart,
+      natalChart,
+      birthDate,
     });
+    reading = result.reading;
+    dossier = result.dossier;
   } catch (err) {
     console.error("Reading generation failed:", err);
     const message =
@@ -140,6 +190,8 @@ export async function POST(req: NextRequest) {
     chart,
     readingMarkdown: reading,
     model: READING_MODEL,
+    dossier,
+    natalChart,
   });
 
   const response: ReadingResponse = {
@@ -154,6 +206,8 @@ export async function POST(req: NextRequest) {
     chart,
     reading,
     model: READING_MODEL,
+    dossier,
+    natalChart,
     persisted: Boolean(id),
   };
 
