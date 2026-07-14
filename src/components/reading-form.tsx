@@ -8,6 +8,8 @@ import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { Label } from "./ui/label";
 import { Combobox, type ComboOption } from "./ui/combobox";
+import { DatePicker } from "./ui/date-picker";
+import { TimePicker } from "./ui/time-picker";
 import { Card, CardContent } from "./ui/card";
 import { PlaceAutocomplete } from "./place-autocomplete";
 import { ReadingDisplay } from "./reading-display";
@@ -187,21 +189,18 @@ export function ReadingForm() {
                 <Label htmlFor="dateOfDeath">
                   Date of death <span className="text-gold/70">*</span>
                 </Label>
-                <Input
+                <DatePicker
                   id="dateOfDeath"
-                  type="date"
                   value={dateOfDeath}
-                  onChange={(e) => setDateOfDeath(e.target.value)}
-                  max={new Date().toISOString().slice(0, 10)}
+                  onChange={setDateOfDeath}
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="timeOfDeath">Time of death (optional)</Label>
-                <Input
+                <TimePicker
                   id="timeOfDeath"
-                  type="time"
                   value={timeOfDeath}
-                  onChange={(e) => setTimeOfDeath(e.target.value)}
+                  onChange={setTimeOfDeath}
                 />
               </div>
             </div>
@@ -246,9 +245,7 @@ export function ReadingForm() {
                   emptyText="No matching time zone"
                 />
                 <p className="text-[11px] text-muted-foreground/70">
-                  Leave on &ldquo;Detect from place&rdquo; unless you know the
-                  civil time zone at the moment of passing. Daylight saving is
-                  handled for you.
+                  Override only if you know it differs. Daylight saving is handled.
                 </p>
               </div>
             )}
