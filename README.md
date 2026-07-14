@@ -131,40 +131,39 @@ reading. Edit it there to retune tone or structure.
 ## ✦ On the astronomy
 
 Charts are cast with the **Swiss Ephemeris** — the same library professional
-astrologers rely on — via `sweph-wasm`, a WebAssembly build. We run it in
-**Moshier mode** (`SEFLG_MOSEPH`): Swiss Ephemeris's built-in analytical model,
-which is arcsecond-accurate and **needs none of the external `.se1` data
-files**, so the app deploys to Vercel's serverless runtime with no native
-compilation and no multi-hundred-megabyte database to ship. Positions are true
-geocentric apparent longitudes in the tropical zodiac of date; houses are
-**Placidus** (with a whole-sign fallback at extreme latitudes) computed from the
-Swiss `swe_houses` Ascendant/Midheaven.
+astrologers rely on — via `sweph-wasm`, a WebAssembly build. It runs in **full
+Swiss mode** (`SEFLG_SWIEPH`) against the **JPL-DE431-derived `.se1` data
+files**, the authoritative, sub-arcsecond source. The two files covering
+1800–2400 AD (main planets incl. Pluto + Moon, ~1.8 MB) ship with the package;
+at startup we load their bytes directly into the Emscripten in-memory
+filesystem and point Swiss Ephemeris at them — so there is **no runtime CDN
+fetch and no native compilation**.
+
+Positions are true geocentric apparent longitudes in the tropical zodiac of
+date. Houses are **Placidus** (whole-sign fallback at extreme latitudes)
+computed from the Swiss `swe_houses` Ascendant/Midheaven. If the data files
+can't be loaded, or a date falls outside their range, the engine falls back —
+per body — to Swiss Ephemeris's built-in analytical **Moshier** model (still
+arcsecond-accurate), so a reading is always produced. The chart records which
+source was used (`chart.ephemeris`), shown in the UI and passed to the reading.
 
 The WASM module is instantiated from its binary bytes (read via `fs`), which
-sidesteps the Emscripten `fetch` loader that doesn't work under Node. Two Next
+sidesteps the Emscripten `fetch` loader that doesn't work under Node. Three Next
 settings make this production-safe (see `next.config.mjs`): `sweph-wasm` is a
 `serverExternalPackage`, and `outputFileTracingIncludes` bundles the `.wasm`
-binary into the function while `outputFileTracingExcludes` keeps the unused
-`ephe/` data files out.
+binary **and the two `.se1` files** into the serverless function (the full
+multi-hundred-MB ephemeris set is not shipped).
 
-### Running in full Swiss mode (optional, maximum precision)
+### Widening the date range or adding bodies
 
-Moshier is already excellent. To run in full Swiss mode against the JPL-derived
-`.se1` **sources** for sub-arcsecond precision:
-
-1. Obtain the Swiss data files (`sepl_18.se1`, `semo_18.se1`, `seas_18.se1`
-   cover 1800–2400 AD; from [astro.com/ftp/swisseph/ephe](https://www.astro.com/ftp/swisseph/ephe/)).
-   `sweph-wasm` also ships them under `node_modules/sweph-wasm/dist/ephe/`.
-2. Point the engine at them and drop the Moshier flag in
-   [`src/lib/astrology.ts`](src/lib/astrology.ts):
-   ```ts
-   await swe.swe_set_ephe_path("/path/to/ephe");     // or the bundled ephe dir
-   const iflag = swe.SEFLG_SWIEPH | swe.SEFLG_SPEED; // instead of SEFLG_MOSEPH
-   ```
-3. Bundle the chosen `.se1` files into the function (add them to
-   `outputFileTracingIncludes` and remove the `ephe/**` exclude).
-
-`src/lib/astrology.ts` is the single seam — the rest of the app is unchanged.
+The bundled `sepl_18.se1` / `semo_18.se1` cover 1800–2400 AD and every body this
+app computes. For dates outside that range or additional points (asteroids,
+fixed stars), add the relevant `.se1` files — they're under
+`node_modules/sweph-wasm/dist/ephe/`, or from
+[astro.com/ftp/swisseph/ephe](https://www.astro.com/ftp/swisseph/ephe/) — to
+both `EPHE_FILES` in [`src/lib/astrology.ts`](src/lib/astrology.ts) and
+`outputFileTracingIncludes` in `next.config.mjs`. That file is the single seam;
+the rest of the app is unchanged.
 
 ## ✦ The logo
 

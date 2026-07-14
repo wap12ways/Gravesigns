@@ -55,6 +55,8 @@ export interface DeathChart {
   dominantElement: string;
   dominantModality: string;
   moonPhase: string;
+  /** Which Swiss Ephemeris data source produced the positions */
+  ephemeris: string;
 }
 
 export interface Reading {

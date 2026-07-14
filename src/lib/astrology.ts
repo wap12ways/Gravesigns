@@ -2,13 +2,15 @@
  * Death Chart calculation — powered by the Swiss Ephemeris.
  *
  * We use `sweph-wasm`, a WebAssembly build of the Swiss Ephemeris (the same
- * C library professional astrologers rely on), run in **Moshier mode**
- * (`SEFLG_MOSEPH`). Moshier is Swiss Ephemeris's built-in analytical model:
- * arcsecond-accurate and self-contained, so it needs none of the external
- * `.se1` data files — which keeps the app deployable on Vercel's serverless
- * filesystem with zero native compilation. To run in full Swiss mode instead,
- * ship the `.se1` sources, call `swe.swe_set_ephe_path(...)`, and drop the
- * `SEFLG_MOSEPH` flag; nothing else here changes.
+ * C library professional astrologers rely on), running in **full Swiss mode**
+ * (`SEFLG_SWIEPH`) against the JPL-DE431-derived `.se1` data files — the
+ * authoritative, sub-arcsecond source astrologers expect. The `.se1` files
+ * ship with the package; we load their bytes directly into the Emscripten
+ * in-memory filesystem at init and point Swiss Ephemeris at them, so there is
+ * no runtime CDN fetch and no native compilation. If the data files can't be
+ * loaded (or a date falls outside their 1800–2400 AD range), we fall back to
+ * Swiss Ephemeris's built-in analytical **Moshier** model (still arcsecond-
+ * accurate), per body, so a reading is always produced.
  *
  * The WASM module is instantiated from its binary bytes (read via fs), which
  * avoids the Emscripten `fetch`-based loader that doesn't work in Node. The
@@ -58,6 +60,7 @@ interface SwissEph {
   SE_NEPTUNE: number;
   SE_PLUTO: number;
   SE_TRUE_NODE: number;
+  SEFLG_SWIEPH: number;
   SEFLG_MOSEPH: number;
   SEFLG_SPEED: number;
   swe_julday(y: number, m: number, d: number, hourUt: number, gregflag: number): number;
@@ -69,14 +72,68 @@ interface SwissEph {
     hsys: string
   ): { cusps: number[]; ascmc: number[] };
   swe_close(): void;
+  /** The underlying Emscripten module (FS + memory helpers). */
+  wasm: EmscriptenModule;
+}
+
+interface EmscriptenModule {
+  FS: {
+    analyzePath(p: string, dontResolveLastLink?: boolean): { exists: boolean };
+    mkdir(p: string): void;
+    writeFile(p: string, data: Uint8Array): void;
+  };
+  lengthBytesUTF8(s: string): number;
+  stringToUTF8(s: string, ptr: number, maxBytes: number): void;
+  _malloc(n: number): number;
+  _free(ptr: number): void;
+  _swe_set_ephe_path(ptr: number): void;
 }
 
 const GREG_CAL = 1;
 
-// Cached, lazily-initialised Swiss Ephemeris instance (per server process).
-let swePromise: Promise<SwissEph> | null = null;
+// Swiss data files covering 1800–2400 AD: main planets (incl. Pluto) + Moon.
+// Enough for every body this app computes (Sun–Pluto, True Node).
+const EPHE_FILES = ["sepl_18.se1", "semo_18.se1"];
 
-async function getSwe(): Promise<SwissEph> {
+interface SweInstance {
+  swe: SwissEph;
+  /** true when the Swiss .se1 data files were loaded into the WASM FS */
+  epheLoaded: boolean;
+}
+
+// Cached, lazily-initialised Swiss Ephemeris instance (per server process).
+let swePromise: Promise<SweInstance> | null = null;
+
+/** Copy the .se1 bytes into the Emscripten in-memory FS and set the ephe path. */
+function loadEphemerisFiles(swe: SwissEph, epheDir: string): boolean {
+  try {
+    const w = swe.wasm;
+    if (!w.FS.analyzePath("/ephe").exists) w.FS.mkdir("/ephe");
+    let loaded = 0;
+    for (const f of EPHE_FILES) {
+      try {
+        const bytes = readFileSync(path.join(epheDir, f));
+        w.FS.writeFile("/ephe/" + f, bytes);
+        loaded++;
+      } catch {
+        // a missing file just means we lean on Moshier for that body
+      }
+    }
+    if (loaded === 0) return false;
+    // Point Swiss Ephemeris at the in-memory directory (native call).
+    const p = "/ephe";
+    const len = w.lengthBytesUTF8(p) + 1;
+    const ptr = w._malloc(len);
+    w.stringToUTF8(p, ptr, len);
+    w._swe_set_ephe_path(ptr);
+    w._free(ptr);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function getSwe(): Promise<SweInstance> {
   if (swePromise) return swePromise;
   swePromise = (async () => {
     // Use a distinctly-named require handle so the bundler doesn't rewrite
@@ -99,7 +156,10 @@ async function getSwe(): Promise<SwissEph> {
     const wasmBinary = readFileSync(path.join(wasmDir, "swisseph.wasm"));
 
     const wasmModule = await factory({ wasmBinary });
-    return new SwissEPH(wasmModule) as SwissEph;
+    const swe = new SwissEPH(wasmModule) as SwissEph;
+
+    const epheLoaded = loadEphemerisFiles(swe, path.join(wasmDir, "..", "ephe"));
+    return { swe, epheLoaded };
   })();
   return swePromise;
 }
@@ -173,7 +233,7 @@ export async function computeDeathChart(params: {
   const { dateOfDeath, timeOfDeath, latitude, longitude } = params;
   const { date, timeKnown } = buildTimestamp(dateOfDeath, timeOfDeath, longitude);
 
-  const swe = await getSwe();
+  const { swe, epheLoaded } = await getSwe();
   const hourUt =
     date.getUTCHours() +
     date.getUTCMinutes() / 60 +
@@ -185,7 +245,22 @@ export async function computeDeathChart(params: {
     hourUt,
     GREG_CAL
   );
-  const iflag = swe.SEFLG_MOSEPH | swe.SEFLG_SPEED;
+
+  // Prefer full Swiss mode (DE431 data files); fall back to the built-in
+  // Moshier model per body if the files are absent or the date is out of range.
+  const primaryFlag = epheLoaded ? swe.SEFLG_SWIEPH : swe.SEFLG_MOSEPH;
+  const speed = swe.SEFLG_SPEED;
+  let usedMoshierFallback = false;
+  const calcBody = (ipl: number): number[] => {
+    try {
+      const r = swe.swe_calc_ut(jd, ipl, primaryFlag | speed);
+      if (Number.isFinite(r?.[0])) return r;
+    } catch {
+      // fall through to Moshier
+    }
+    usedMoshierFallback = true;
+    return swe.swe_calc_ut(jd, ipl, swe.SEFLG_MOSEPH | speed);
+  };
 
   const locationKnown =
     typeof latitude === "number" &&
@@ -223,7 +298,7 @@ export async function computeDeathChart(params: {
   ];
 
   const planets: PlanetPosition[] = bodyDefs.map(({ name, ipl }) => {
-    const r = swe.swe_calc_ut(jd, ipl, iflag);
+    const r = calcBody(ipl);
     const lon = norm360(r[0]);
     const speed = r[3];
     const { sign, degreeInSign } = signFromLongitude(lon);
@@ -277,8 +352,15 @@ export async function computeDeathChart(params: {
   const sun = planets.find((p) => p.name === "Sun")!;
   const moon = planets.find((p) => p.name === "Moon")!;
 
+  const ephemeris = !epheLoaded
+    ? "Swiss Ephemeris · Moshier model"
+    : usedMoshierFallback
+      ? "Swiss Ephemeris · Swiss data files (DE431), Moshier fallback for out-of-range bodies"
+      : "Swiss Ephemeris · Swiss data files (DE431-derived)";
+
   return {
     timestampUtc: date.toISOString(),
+    ephemeris,
     timeKnown,
     locationKnown: Boolean(locationKnown && ascLon !== null),
     latitude: typeof latitude === "number" ? latitude : null,
@@ -303,7 +385,7 @@ export function chartToText(chart: DeathChart, _fullName: string): string {
 
   const lines: string[] = [];
   lines.push(`Chart moment (UTC): ${chart.timestampUtc}`);
-  lines.push(`Ephemeris: Swiss Ephemeris (Moshier), tropical zodiac`);
+  lines.push(`Ephemeris: ${chart.ephemeris} · tropical zodiac · Placidus houses`);
   lines.push(
     `Time of death known: ${chart.timeKnown ? "yes" : "no (noon assumed)"}; Location known: ${chart.locationKnown ? "yes" : "no"}`
   );

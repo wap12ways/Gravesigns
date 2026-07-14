@@ -7,14 +7,16 @@ const nextConfig = {
   // .wasm binary don't survive bundling).
   serverExternalPackages: ["sweph-wasm"],
 
-  // Ensure the .wasm binary is traced into the serverless function. We read it
-  // with fs at runtime, which the tracer can't detect statically. We do NOT
-  // ship the multi-hundred-MB `.se1` data files — Moshier mode needs none.
+  // Trace the WASM binary AND the Swiss `.se1` data files into the serverless
+  // function. We read them with fs at runtime, which the tracer can't detect
+  // statically. We ship only the two files covering 1800–2400 AD (main planets
+  // + Moon, ~1.8 MB) — not the full multi-hundred-MB ephemeris set.
   outputFileTracingIncludes: {
-    "/api/readings": ["./node_modules/sweph-wasm/dist/wasm/swisseph.wasm"],
-  },
-  outputFileTracingExcludes: {
-    "*": ["./node_modules/sweph-wasm/dist/ephe/**"],
+    "/api/readings": [
+      "./node_modules/sweph-wasm/dist/wasm/swisseph.wasm",
+      "./node_modules/sweph-wasm/dist/ephe/sepl_18.se1",
+      "./node_modules/sweph-wasm/dist/ephe/semo_18.se1",
+    ],
   },
 };
 

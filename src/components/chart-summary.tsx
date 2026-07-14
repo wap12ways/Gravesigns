@@ -90,6 +90,11 @@ export function ChartSummary({ chart }: { chart: DeathChart }) {
         </div>
       )}
 
+      <p className="text-[11px] text-muted-foreground/60">
+        Positions computed with {chart.ephemeris}. Tropical zodiac; Placidus
+        houses (whole-sign fallback at extreme latitudes).
+      </p>
+
       {(!chart.timeKnown || !chart.locationKnown) && (
         <p className="text-xs italic text-muted-foreground/80">
           {!chart.timeKnown
