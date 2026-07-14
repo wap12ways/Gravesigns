@@ -13,6 +13,11 @@ export interface ReadingRequest {
   latitude?: number | null;
   longitude?: number | null;
   type: SubjectType;
+  /**
+   * Optional IANA time-zone override (e.g. "America/New_York"). When absent,
+   * the zone is auto-detected from the place of death.
+   */
+  timezone?: string | null;
   /** Personality traits, cultural background, special notes — optional */
   notes?: string | null;
 }

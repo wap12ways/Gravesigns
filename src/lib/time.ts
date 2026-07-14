@@ -25,7 +25,9 @@ export function resolveDeathMoment(
   dateOfDeath: string,
   timeOfDeath: string | null | undefined,
   latitude: number | null | undefined,
-  longitude: number | null | undefined
+  longitude: number | null | undefined,
+  /** Explicit IANA zone override; when set it wins over the geocoded lookup. */
+  timezoneOverride?: string | null
 ): DeathMoment {
   const [y, m, d] = dateOfDeath.split("-").map(Number);
   const timeKnown = Boolean(timeOfDeath && /^\d{1,2}:\d{2}$/.test(timeOfDeath));
@@ -33,22 +35,29 @@ export function resolveDeathMoment(
     ? (timeOfDeath as string).split(":").map(Number)
     : [12, 0];
 
-  if (typeof latitude === "number" && typeof longitude === "number") {
+  // Zone precedence: an explicit user override, else the geocoded location.
+  let zone: string | null = null;
+  if (timezoneOverride) {
+    zone = timezoneOverride;
+  } else if (typeof latitude === "number" && typeof longitude === "number") {
     try {
-      const zone = tzlookup(latitude, longitude);
-      const dt = DateTime.fromObject(
-        { year: y, month: m, day: d, hour: hh, minute: mm },
-        { zone }
-      );
-      if (dt.isValid) {
-        return { date: new Date(dt.toMillis()), timeKnown, timezone: zone };
-      }
+      zone = tzlookup(latitude, longitude);
     } catch {
-      // fall through to UTC
+      zone = null;
     }
   }
 
-  // No location (or lookup failed): treat the supplied clock time as UTC.
+  if (zone) {
+    const dt = DateTime.fromObject(
+      { year: y, month: m, day: d, hour: hh, minute: mm },
+      { zone }
+    );
+    if (dt.isValid) {
+      return { date: new Date(dt.toMillis()), timeKnown, timezone: zone };
+    }
+  }
+
+  // No zone (or invalid): treat the supplied clock time as UTC.
   return {
     date: new Date(Date.UTC(y, m - 1, d, hh, mm, 0)),
     timeKnown,

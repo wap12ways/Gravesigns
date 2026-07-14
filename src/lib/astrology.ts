@@ -204,15 +204,18 @@ export async function computeDeathChart(params: {
   timeOfDeath?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  timezone?: string | null;
 }): Promise<DeathChart> {
   const { dateOfDeath, timeOfDeath, latitude, longitude } = params;
   // Resolve the exact UTC instant using the civil time zone at the place of
   // death (DST + historical rules), so the Ascendant and houses are accurate.
+  // An explicit user-supplied zone overrides the geocoded lookup.
   const { date, timeKnown, timezone } = resolveDeathMoment(
     dateOfDeath,
     timeOfDeath,
     latitude ?? null,
-    longitude ?? null
+    longitude ?? null,
+    params.timezone ?? null
   );
 
   const { swe, epheLoaded } = await getSwe();

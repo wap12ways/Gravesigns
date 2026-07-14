@@ -1,15 +1,34 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Sparkles, Loader2, User, PawPrint } from "lucide-react";
 import type { ReadingResponse, SubjectType } from "@/lib/types";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { Label } from "./ui/label";
+import { NativeSelect } from "./ui/native-select";
 import { Card, CardContent } from "./ui/card";
 import { ReadingDisplay } from "./reading-display";
 import { cn } from "@/lib/utils";
+
+/** Full IANA zone list from the browser, with a small fallback. */
+function listTimeZones(): string[] {
+  try {
+    const sv = (
+      Intl as unknown as { supportedValuesOf?: (k: string) => string[] }
+    ).supportedValuesOf;
+    if (typeof sv === "function") return sv("timeZone");
+  } catch {
+    // fall through
+  }
+  return [
+    "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles",
+    "America/Sao_Paulo", "Europe/London", "Europe/Paris", "Europe/Berlin",
+    "Europe/Moscow", "Africa/Johannesburg", "Asia/Dubai", "Asia/Kolkata",
+    "Asia/Shanghai", "Asia/Tokyo", "Australia/Sydney", "Pacific/Auckland", "UTC",
+  ];
+}
 
 const LOADING_LINES = [
   "Casting the sky for the moment of crossing…",
@@ -25,7 +44,9 @@ export function ReadingForm() {
   const [dateOfDeath, setDateOfDeath] = useState("");
   const [timeOfDeath, setTimeOfDeath] = useState("");
   const [place, setPlace] = useState("");
+  const [timezone, setTimezone] = useState(""); // "" = detect from place
   const [notes, setNotes] = useState("");
+  const zones = useMemo(() => listTimeZones(), []);
 
   const [loading, setLoading] = useState(false);
   const [loadingLine, setLoadingLine] = useState(0);
@@ -64,6 +85,7 @@ export function ReadingForm() {
           timeOfDeath: timeOfDeath || null,
           place: place.trim() || null,
           type,
+          timezone: timeOfDeath && timezone ? timezone : null,
           notes: notes.trim() || null,
         }),
       });
@@ -161,6 +183,29 @@ export function ReadingForm() {
                 A place and time together unlock the houses and rising sign.
               </p>
             </div>
+
+            {timeOfDeath && (
+              <div className="space-y-2 animate-fade-up">
+                <Label htmlFor="timezone">Time zone</Label>
+                <NativeSelect
+                  id="timezone"
+                  value={timezone}
+                  onChange={(e) => setTimezone(e.target.value)}
+                >
+                  <option value="">Detect from place of death</option>
+                  {zones.map((z) => (
+                    <option key={z} value={z}>
+                      {z.replace(/_/g, " ")}
+                    </option>
+                  ))}
+                </NativeSelect>
+                <p className="text-[11px] text-muted-foreground/70">
+                  Leave on &ldquo;Detect from place&rdquo; unless you know the
+                  civil time zone at the moment of passing. Daylight saving is
+                  handled for you.
+                </p>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="notes">

@@ -54,6 +54,16 @@ export async function POST(req: NextRequest) {
   const place = body.place?.trim() || null;
   const notes = body.notes?.trim() || null;
 
+  // Optional IANA time-zone override — validate it's a real zone before use.
+  let timezone: string | null = body.timezone?.trim() || null;
+  if (timezone) {
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: timezone });
+    } catch {
+      timezone = null; // silently ignore an invalid zone; auto-detect instead
+    }
+  }
+
   if (!fullName) {
     return NextResponse.json(
       { error: "The name of the deceased is required." },
@@ -81,7 +91,13 @@ export async function POST(req: NextRequest) {
   // 1) Calculate the death chart.
   let chart;
   try {
-    chart = await computeDeathChart({ dateOfDeath, timeOfDeath, latitude, longitude });
+    chart = await computeDeathChart({
+      dateOfDeath,
+      timeOfDeath,
+      latitude,
+      longitude,
+      timezone,
+    });
   } catch (err) {
     console.error("Chart calculation failed:", err);
     return NextResponse.json(
