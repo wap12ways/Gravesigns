@@ -13,7 +13,7 @@ crosses — for people and beloved pets alike.
 
 GraveSigns casts a **true death chart** for the moment of passing (real
 planetary positions, aspects, houses, and lunar phase from a high-precision
-ephemeris) and composes a sophisticated, tender reading with **Claude Sonnet** —
+ephemeris) and composes a sophisticated, tender reading with **Claude** —
 written in the voice of a practitioner who has spent 20+ years with charts of
 transition.
 
@@ -22,7 +22,8 @@ transition.
 - **Next.js 15** (App Router) + **TypeScript**
 - **Tailwind CSS** + **shadcn/ui**-style components
 - **Supabase** (Postgres) for storing readings
-- **Anthropic Claude** (`claude-sonnet-5` by default) for reading generation
+- **Anthropic Claude** for reading generation — five passes, each on a model you
+  choose (defaults to `claude-opus-4-8` everywhere; per-pass overridable)
 - **Swiss Ephemeris** via **sweph-wasm** — the astrologer's gold-standard ephemeris (full DE431 `.se1` data files), compiled to WebAssembly, no native deps
 - Proper **time-zone resolution** (`tz-lookup` + `luxon`) with DST/historical rules
 - Premium form UX: a **searchable time-zone combobox** with live GMT-offset badges and a **place autocomplete** that pins exact coordinates
@@ -43,9 +44,14 @@ POST /api/readings
         Step 0  computeChartAnalysis()  — deterministic: dignities, Arabic lots,
                 aspect patterns, chart shape, fixed stars, the 8th/4th/12th
                 complex, mortal significators; + lifespan & cross-aspects if natal
-        Pass A  Judgment      — Sonnet distils a weighted, sourced dossier (JSON)
-        Pass B  Composition   — Sonnet composes the reading from the dossier
-        Pass C  Verification  — Sonnet audits it; one revision if it fails
+        Pass A  Judgment      — Claude distils a weighted, sourced dossier (JSON)
+        Pass B  Composition   — Claude composes the reading (born aligned to a
+                                short ethical covenant loaded from the corpus)
+        Pass E  Ethical Alignment — Claude audits the prose against the loaded
+                                Code(s) of Ethics; one revision if misaligned
+        Pass C  Verification  — Claude audits it; one revision if it fails
+        Pass N  Study Notes   — Claude keeps the practitioner's working notebook
+                                on the chart (craft, research threads, limits)
    5. saveReading()            ──►  Supabase (no-op in demo mode)
         │
         ▼
@@ -78,12 +84,12 @@ src/
 │   │   ├── chart-panel.tsx        # tabbed orchestrator (client)
 │   │   ├── chart-wheel.tsx        # SVG wheel + bi-wheel
 │   │   ├── dignities-table.tsx / aspectarian.tsx / mortality-panel.tsx
-│   │   ├── moon-phase.tsx / dossier-notes.tsx
+│   │   ├── moon-phase.tsx / dossier-notes.tsx / study-notes.tsx
 │   ├── logo.tsx / starfield.tsx / site-header.tsx
 │   └── ui/                        # button, input, textarea, label, card
 └── lib/
     ├── astrology.ts               # ephemeris → DeathChart
-    ├── pipeline.ts                # the three-pass reading pipeline
+    ├── pipeline.ts                # the reading pipeline (judgment→compose→ethics→verify→notes)
     ├── analysis/                  # Step-0 deterministic engine
     │   ├── reference.ts           # source-verified traditional tables
     │   ├── dignities.ts / lots.ts / patterns.ts / fixedstars.ts
@@ -91,11 +97,16 @@ src/
     │   ├── lifespan.ts / synastry.ts   # natal (Tier-2) doctrine
     │   ├── serialize.ts           # analysis → evidence brief
     │   └── index.ts               # computeChartAnalysis()
+    ├── knowledge/                 # the reference corpus (ethics + future kinds)
+    │   ├── index.ts               # loadKnowledge() — Supabase w/ bundled fallback
+    │   └── documents/
+    │       └── ncgr-code-of-ethics.ts   # bundled, verbatim NCGR code
     ├── glyphs.ts                  # shared glyphs + element palette
     ├── supabase.ts                # persistence (graceful demo fallback)
     ├── markdown.ts                # tiny, safe MD → HTML
     └── types.ts
-supabase/schema.sql               # the readings table + RLS
+supabase/schema.sql               # readings + knowledge_documents tables + RLS
+supabase/seed/knowledge_documents.sql  # seeds the corpus (NCGR code of ethics)
 .env.example                      # environment variables
 ```
 
@@ -123,7 +134,11 @@ npm run dev
 
 1. Create a project at [supabase.com](https://supabase.com).
 2. Open **SQL Editor** and run [`supabase/schema.sql`](supabase/schema.sql).
-3. From **Project Settings → API**, copy into `.env.local`:
+3. Run [`supabase/seed/knowledge_documents.sql`](supabase/seed/knowledge_documents.sql)
+   to seed the knowledge corpus (the NCGR Code of Ethics). Optional — the app
+   ships with a bundled copy and falls back to it, but seeding makes the code
+   editable in the database without a redeploy.
+4. From **Project Settings → API**, copy into `.env.local`:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY` (server-only — never expose to the browser)
@@ -131,6 +146,25 @@ npm run dev
 The API routes write with the service-role key, so inserts succeed with RLS on.
 A public **read** policy is included so the gallery renders; tighten it for
 production.
+
+### The knowledge corpus & the ethical-alignment pass
+
+`knowledge_documents` is a general, versioned store of the practice's compiled
+reference material — the Code of Ethics is its first `kind`; later kinds
+(association standards, articles, webinar transcripts, published readings, case
+data) are added as **rows**, with no schema or code change. The reading engine
+reads it through one seam, [`src/lib/knowledge`](src/lib/knowledge), which loads
+active documents from Supabase and **falls back to the bundled copies** when the
+DB is unconfigured, empty, or lagging the schema — so a reading is never blocked.
+
+The reading pipeline consults it twice: a short **operating summary** of the
+code is folded into the composition pass so drafts are born aligned, and a
+dedicated **Pass E — Ethical Alignment** then audits the finished prose against
+the full code and revises it once if it is materially misaligned. Its verdict
+(which clauses were engaged, what was adjusted) is persisted on the reading as
+`ethics_review`. To retune what the engine aligns against, edit the
+`knowledge_documents` row (no deploy) or the bundled file — the text is loaded
+as data, never hardcoded into a prompt.
 
 ## ✦ Deploy to Vercel
 
@@ -148,11 +182,26 @@ ephemeris and the Anthropic SDK) and streams each pass to avoid HTTP timeouts.
 
 ## ✦ Customizing the reading voice
 
-The three astrologer personas live in [`src/lib/pipeline.ts`](src/lib/pipeline.ts):
+The astrologer personas live in [`src/lib/pipeline.ts`](src/lib/pipeline.ts):
 `JUDGMENT_SYSTEM` (what evidence to weigh), `COMPOSITION_SYSTEM` (voice,
-integrity, and the section shape of every reading), and `VERIFY_SYSTEM` (the
-integrity audit). Edit them there to retune the craft. The deterministic
-astrology it all builds on lives in [`src/lib/analysis/`](src/lib/analysis).
+integrity, and the section shape of every reading), `ETHICS_SYSTEM` (the
+ethical-alignment audit), `VERIFY_SYSTEM` (the integrity audit), and
+`STUDY_NOTES_SYSTEM` (the practitioner's notebook). Edit them there to retune
+the craft. The deterministic astrology it all builds on lives in
+[`src/lib/analysis/`](src/lib/analysis).
+
+### Choosing a model per pass
+
+Each of the five passes picks its model from `MODELS` in
+[`src/lib/pipeline.ts`](src/lib/pipeline.ts), and every pass is independently
+overridable by environment variable — so the pipeline can be tiered for cost or
+latency without a code change. All passes default to **`claude-opus-4-8`**;
+`ANTHROPIC_MODEL` sets the default for all at once, and the per-pass vars
+(`ANTHROPIC_MODEL_JUDGMENT`, `…_COMPOSITION`, `…_ETHICS`, `…_VERIFICATION`,
+`…_STUDY_NOTES`) override individual passes. The ethics and verification
+**rewrites** always run on the composition model, so the finished reading stays
+at composition grade no matter how cheaply the audits are tiered. See
+[`.env.example`](.env.example) for a ready cost-tiered profile.
 
 ## ✦ On the astronomy
 

@@ -28,6 +28,8 @@ export async function GET(
     model: row.model,
     dossier: row.dossier ?? null,
     natalChart: row.natal_chart ?? null,
+    ethicsReview: row.ethics_review ?? null,
+    studyNotes: row.study_notes ?? null,
     persisted: true,
   };
   return NextResponse.json(response);

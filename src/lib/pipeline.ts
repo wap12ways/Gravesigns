@@ -7,7 +7,11 @@
  *                           structured, weighted dossier (JSON, tool-forced).
  *                           It weighs; it never composes or predicts cause/date.
  *   Pass B  Composition   — Sonnet turns the dossier + subject context into the
- *                           finished prose reading.
+ *                           finished prose reading, born aligned to a short
+ *                           ethical covenant loaded from the knowledge corpus.
+ *   Pass E  Ethical Alignment — Sonnet audits the finished prose against the
+ *                           loaded Code(s) of Ethics and revises it once if it
+ *                           is materially misaligned. Runs after B, before C.
  *   Pass C  Verification  — Sonnet audits the draft against the chart for
  *                           fabricated placements, forbidden claims, and tone,
  *                           and the draft is revised once if it fails.
@@ -22,13 +26,46 @@ import type {
   JudgmentDossier,
   JudgmentFactor,
   VerificationReport,
+  EthicsReview,
+  EthicsConcern,
+  KnowledgeDocument,
+  StudyNotes,
+  StudyNote,
 } from "./types";
 import { computeChartAnalysis } from "./analysis";
 import { analysisToText, natalContextToText } from "./analysis/serialize";
 import { computeLifespan } from "./analysis/lifespan";
 import { computeCrossAspects } from "./analysis/synastry";
+import { getCodesOfEthics, operatingSummary, codeLabel } from "./knowledge";
 
-export const READING_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
+/**
+ * Per-pass model selection. Every pass defaults to Opus 4.8 (the "showcase"
+ * profile) and is independently overridable by environment variable, so the
+ * pipeline can be tiered later (e.g. Sonnet for judgment, Haiku for the audits)
+ * without any code change. `ANTHROPIC_MODEL` sets the fallback default for all
+ * passes at once.
+ *
+ * Rewrites are deliberately NOT their own knob: both the ethics and the
+ * verification rewrite regenerate the family-facing reading, so they always run
+ * on the composition model. That keeps the finished prose at composition grade
+ * no matter how cheap the audits are tiered down to.
+ */
+const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-4-8";
+
+export const MODELS = {
+  judgment: process.env.ANTHROPIC_MODEL_JUDGMENT || DEFAULT_MODEL,
+  composition: process.env.ANTHROPIC_MODEL_COMPOSITION || DEFAULT_MODEL,
+  ethics: process.env.ANTHROPIC_MODEL_ETHICS || DEFAULT_MODEL,
+  verification: process.env.ANTHROPIC_MODEL_VERIFICATION || DEFAULT_MODEL,
+  studyNotes: process.env.ANTHROPIC_MODEL_STUDY_NOTES || DEFAULT_MODEL,
+} as const;
+
+/**
+ * The model that composed the reading — the meaningful single value to record
+ * on a saved reading (rewrites share it). Kept as a named export for the API
+ * route and any caller that persists a `model` field.
+ */
+export const READING_MODEL = MODELS.composition;
 
 export interface PipelineArgs {
   fullName: string;
@@ -47,6 +84,8 @@ export interface PipelineResult {
   reading: string;
   dossier: JudgmentDossier | null;
   verification: VerificationReport | null;
+  ethicsReview: EthicsReview | null;
+  studyNotes: StudyNotes | null;
   model: string;
 }
 
@@ -132,7 +171,7 @@ const JUDGMENT_TOOL: Anthropic.Tool = {
 
 async function runJudgment(args: PipelineArgs, brief: string): Promise<JudgmentDossier> {
   const msg = await client().messages.create({
-    model: READING_MODEL,
+    model: MODELS.judgment,
     max_tokens: 4096,
     system: JUDGMENT_SYSTEM,
     tools: [JUDGMENT_TOOL],
@@ -251,16 +290,32 @@ quiet reflection. Never frame it as prediction, and never suggest the chart
 The cross-aspects — how the sky at the crossing answered the natal promise,
 especially the slow, karmic bodies returning to the places of birth.`;
 
+/**
+ * The composition-time ethical covenant. A short distillation of the loaded
+ * Code(s) of Ethics is folded into the composer's system prompt so the draft is
+ * born aligned — the dedicated Pass E then audits the finished prose against the
+ * full code. Kept as data (loaded, not hardcoded), so the code can be retuned
+ * without touching this file.
+ */
+function covenantBlock(ethicalCovenant: string): string {
+  if (!ethicalCovenant.trim()) return "";
+  return `\n\nETHICAL COVENANT (you write within these professional standards)\n${ethicalCovenant.trim()}`;
+}
+
 async function runComposition(
   args: PipelineArgs,
   brief: string,
   dossier: JudgmentDossier,
-  hasNatal: boolean
+  hasNatal: boolean,
+  ethicalCovenant: string
 ): Promise<string> {
   const stream = client().messages.stream({
-    model: READING_MODEL,
+    model: MODELS.composition,
     max_tokens: 4608,
-    system: COMPOSITION_SYSTEM + (hasNatal ? TIER2_ADDENDUM : ""),
+    system:
+      COMPOSITION_SYSTEM +
+      (hasNatal ? TIER2_ADDENDUM : "") +
+      covenantBlock(ethicalCovenant),
     messages: [
       {
         role: "user",
@@ -313,7 +368,7 @@ async function runVerification(
   reading: string
 ): Promise<VerificationReport> {
   const msg = await client().messages.create({
-    model: READING_MODEL,
+    model: MODELS.verification,
     max_tokens: 1024,
     system: VERIFY_SYSTEM,
     tools: [VERIFY_TOOL],
@@ -349,7 +404,7 @@ async function runRevision(
   issues: string[]
 ): Promise<string> {
   const stream = client().messages.stream({
-    model: READING_MODEL,
+    model: MODELS.composition, // a rewrite of the reading — stays at composition grade
     max_tokens: 4096,
     system: REVISE_SYSTEM,
     messages: [
@@ -373,6 +428,252 @@ async function runRevision(
   return text || reading;
 }
 
+/* ------------------------------------------------------------------ Pass E */
+/* Ethical Alignment — audits the composed reading against the loaded Code(s) of
+ * Ethics and, when needed, revises it once into alignment. Runs AFTER
+ * composition (it needs the finished prose) and BEFORE verification (so the
+ * factual-integrity gate still runs over any ethics rewrite). Degrades
+ * gracefully: any failure returns the draft untouched. The code text is passed
+ * in as data, never hardcoded, so tightening the standard is a data change. */
+
+const ETHICS_SYSTEM = `You are the ethics steward of GraveSigns, a death-chart practice. You audit a drafted reading — written for a grieving family or pet owner — against one or more professional Codes of Ethics supplied to you AS DATA in the user message.
+
+Your charge is ALIGNMENT, not astrology. You do not re-judge the chart, re-weight testimonies, or add or remove placements. You examine how the finished reading MEETS a bereaved reader, measured against the supplied code(s): its tone, its framing, its qualifiers, its honesty about limits, its care.
+
+Evaluate the draft against the supplied code text. Weigh especially:
+- Avoiding harm: nothing that could frighten, confuse, or deepen dread.
+- Competence & scope: symbolic/contemplative framing, never medicine, psychology, law, or a claim about how or when death occurred.
+- Qualified, non-final language: "invites reflection / symbolizes," never unequivocal pronouncement or prediction.
+- No manipulation or intimidation of feeling; no sensational or exaggerated claims.
+- Respect for the reader's own beliefs, religion, and culture; no imposed worldview.
+- Honesty about sources and limits; a humane path toward real support when grief needs more than a reading.
+
+Cite the specific clauses the reading engages, by their reference (e.g. "A.4", "D.1"). Mark each as honored, minor, or material. Decide whether a revision is warranted: request one only for MATERIAL misalignments, or an accumulation of minor ones that together compromise care — not for stylistic taste. When you request a revision, give concrete, surgical adjustments the composer can apply without weakening the astrology.
+
+Call record_ethics_review exactly once.`;
+
+const ETHICS_TOOL: Anthropic.Tool = {
+  name: "record_ethics_review",
+  description: "Record the ethical-alignment audit of the drafted reading.",
+  input_schema: {
+    type: "object",
+    properties: {
+      aligned: {
+        type: "boolean",
+        description: "True if the reading meets the supplied code(s) as-is.",
+      },
+      concerns: {
+        type: "array",
+        description: "Clauses the reading engaged — honored or at risk.",
+        items: {
+          type: "object",
+          properties: {
+            code: { type: "string", description: "The code's short label, e.g. NCGR." },
+            clause: { type: "string", description: "Clause reference, e.g. A.4." },
+            observation: { type: "string", description: "What in the reading engaged it." },
+            severity: { type: "string", enum: ["honored", "minor", "material"] },
+          },
+          required: ["code", "clause", "observation", "severity"],
+        },
+      },
+      adjustments: {
+        type: "array",
+        items: { type: "string" },
+        description: "Concrete, surgical changes to bring the reading into alignment. Empty when aligned.",
+      },
+      revision_needed: {
+        type: "boolean",
+        description: "True only for material misalignment (or an accumulation of minor ones).",
+      },
+    },
+    required: ["aligned", "concerns", "adjustments", "revision_needed"],
+  },
+};
+
+function codesToText(codes: KnowledgeDocument[]): string {
+  return codes
+    .map((c) => `### ${codeLabel(c)} — ${c.title}\n${c.content}`)
+    .join("\n\n");
+}
+
+async function runEthicsReview(
+  args: PipelineArgs,
+  reading: string,
+  codes: KnowledgeDocument[]
+): Promise<{ review: EthicsReview; adjustments: string[] }> {
+  const msg = await client().messages.create({
+    model: MODELS.ethics,
+    max_tokens: 1536,
+    system: ETHICS_SYSTEM,
+    tools: [ETHICS_TOOL],
+    tool_choice: { type: "tool", name: "record_ethics_review" },
+    messages: [
+      {
+        role: "user",
+        content:
+          `SUBJECT\n${subjectLine(args)}\n\n` +
+          `CODE(S) OF ETHICS (authoritative — audit against these)\n\`\`\`\n${codesToText(codes)}\n\`\`\`\n\n` +
+          `DRAFT READING\n\`\`\`\n${reading}\n\`\`\`\n\nAudit it against the code(s) now.`,
+      },
+    ],
+  });
+
+  const block = msg.content.find(
+    (b): b is Anthropic.ToolUseBlock =>
+      b.type === "tool_use" && b.name === "record_ethics_review"
+  );
+  const slugs = codes.map((c) => c.slug);
+  if (!block) {
+    return {
+      review: { aligned: true, codes: slugs, concerns: [], adjustments: [], revised: false },
+      adjustments: [],
+    };
+  }
+  const raw = block.input as {
+    aligned?: boolean;
+    concerns?: EthicsConcern[];
+    adjustments?: string[];
+    revision_needed?: boolean;
+  };
+  const adjustments = raw.adjustments ?? [];
+  const revisionNeeded = Boolean(raw.revision_needed) && adjustments.length > 0;
+  return {
+    review: {
+      aligned: raw.aligned ?? true,
+      codes: slugs,
+      concerns: raw.concerns ?? [],
+      adjustments,
+      revised: false, // the orchestrator sets this true only if the rewrite runs
+    },
+    adjustments: revisionNeeded ? adjustments : [],
+  };
+}
+
+async function runEthicsRevision(
+  args: PipelineArgs,
+  brief: string,
+  dossier: JudgmentDossier,
+  reading: string,
+  adjustments: string[],
+  ethicalCovenant: string
+): Promise<string> {
+  const system = `${COMPOSITION_SYSTEM}${covenantBlock(ethicalCovenant)}
+
+You are revising an existing draft to resolve specific ETHICAL alignment notes from the practice's ethics steward. Apply each adjustment with a light hand: preserve the voice, the structure, and every accurate placement. Change only tone, framing, qualifiers, and care — never the astrology, and never introduce a placement not already present. Return the full corrected reading in Markdown, nothing else.`;
+
+  const stream = client().messages.stream({
+    model: MODELS.composition, // an ethics rewrite of the reading — stays at composition grade
+    max_tokens: 4608,
+    system,
+    messages: [
+      {
+        role: "user",
+        content:
+          `SUBJECT\n${subjectLine(args)}\n\n` +
+          `CHART FRAME (for exact placements you may name)\n\`\`\`\n${brief}\n\`\`\`\n\n` +
+          `DOSSIER\n\`\`\`\n${dossierToText(dossier)}\n\`\`\`\n\n` +
+          `ETHICAL ADJUSTMENTS TO APPLY\n- ${adjustments.join("\n- ")}\n\n` +
+          `CURRENT DRAFT\n\`\`\`\n${reading}\n\`\`\`\n\nReturn the ethically aligned reading.`,
+      },
+    ],
+  });
+  const message = await stream.finalMessage();
+  const text = message.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("")
+    .trim();
+  return text || reading;
+}
+
+/* ------------------------------------------------------------------ Pass N */
+/* Study Notes — the working astrologer's private notebook on this chart, in the
+ * candid technical shorthand a professional jots while studying. Distinct from
+ * the tender family reading (Pass B) and the weighted evidence dossier (Pass A):
+ * these are the margin notes — technique applied and why, notable configurations,
+ * questions worth researching, cross-references to tradition, and honest reads on
+ * where the chart is strong or thin. They accumulate the practice's craft
+ * reasoning over time. Additive and non-blocking: runs last, degrades to null. */
+
+const STUDY_NOTES_SYSTEM = `You are a professional astrologer keeping your own STUDY NOTEBOOK on a death chart you have just read. These notes are for your craft and your continued study — not for the grieving family. Write as a seasoned practitioner jots in the margin: candid, concise, technical, first-person shorthand.
+
+Draw ONLY on the chart frame, the evidence dossier, and the finished reading provided. Never invent a placement or number that is not there.
+
+Produce a spread of notes across these lenses (not every lens needs the same count; follow the chart):
+- craft — the technique you actually leaned on and WHY, notable or unusual configurations, the judgment calls you made (what you up- or down-weighted, and the reasoning). This is the bulk.
+- research — open questions this chart raises, cross-references to the tradition worth pulling ("cf. Valens Anthology III on the Moon's separations"; "check Lilly CA p.653 on the 8th ruler cadent"), patterns to watch for across future charts.
+- confidence — an honest methodological read: where the testimony was strong and concordant vs. thin or strained, what was suppressed and why, how much weight the verdict really carries.
+
+Keep each note tight — a sentence or two. Cite sources in refs where you can. This is a working instrument: precise about the astrology, unsentimental in tone, but never careless about a real person. Do not state or imply a cause, manner, date, or span of the death — even here.
+
+Call record_study_notes exactly once.`;
+
+const STUDY_NOTES_TOOL: Anthropic.Tool = {
+  name: "record_study_notes",
+  description: "Record the practitioner's study notes on the chart.",
+  input_schema: {
+    type: "object",
+    properties: {
+      entries: {
+        type: "array",
+        description: "The notebook entries, in the order you'd study them.",
+        items: {
+          type: "object",
+          properties: {
+            category: {
+              type: "string",
+              enum: ["craft", "research", "confidence"],
+              description: "The lens this note belongs to.",
+            },
+            heading: { type: "string", description: "A short label for the note." },
+            note: { type: "string", description: "A sentence or two of working shorthand." },
+            refs: {
+              type: "array",
+              items: { type: "string" },
+              description: "Sources / cross-references, when any.",
+            },
+          },
+          required: ["category", "heading", "note"],
+        },
+      },
+    },
+    required: ["entries"],
+  },
+};
+
+async function runStudyNotes(
+  args: PipelineArgs,
+  brief: string,
+  dossier: JudgmentDossier,
+  reading: string
+): Promise<StudyNotes> {
+  const msg = await client().messages.create({
+    model: MODELS.studyNotes,
+    max_tokens: 2048,
+    system: STUDY_NOTES_SYSTEM,
+    tools: [STUDY_NOTES_TOOL],
+    tool_choice: { type: "tool", name: "record_study_notes" },
+    messages: [
+      {
+        role: "user",
+        content:
+          `SUBJECT\n${subjectLine(args)}\n\n` +
+          `CHART FRAME (authoritative)\n\`\`\`\n${brief}\n\`\`\`\n\n` +
+          `EVIDENCE DOSSIER\n\`\`\`\n${dossierToText(dossier)}\n\`\`\`\n\n` +
+          `THE FINISHED READING\n\`\`\`\n${reading}\n\`\`\`\n\nWrite your study notes now.`,
+      },
+    ],
+  });
+
+  const block = msg.content.find(
+    (b): b is Anthropic.ToolUseBlock =>
+      b.type === "tool_use" && b.name === "record_study_notes"
+  );
+  if (!block) return { entries: [] };
+  const raw = block.input as { entries?: StudyNote[] };
+  return { entries: (raw.entries ?? []) as StudyNote[] };
+}
+
 /* --------------------------------------------------------------- orchestrate */
 
 export async function runReadingPipeline(args: PipelineArgs): Promise<PipelineResult> {
@@ -391,6 +692,11 @@ export async function runReadingPipeline(args: PipelineArgs): Promise<PipelineRe
     brief += "\n\n" + natalContextToText(natal, natalAnalysis, lifespan, cross);
   }
 
+  // Load the Code(s) of Ethics the reading aligns against. Loaded as data (with
+  // a bundled fallback), so the standard can be retuned without a code change.
+  const ethicsCodes = await getCodesOfEthics();
+  const covenant = operatingSummary(ethicsCodes);
+
   // Pass A — Judgment. If it fails, the composer still gets the raw brief.
   let dossier: JudgmentDossier | null = null;
   try {
@@ -399,10 +705,29 @@ export async function runReadingPipeline(args: PipelineArgs): Promise<PipelineRe
     console.error("[pipeline] judgment pass failed, composing from brief only:", err);
   }
 
-  // Pass B — Composition.
+  // Pass B — Composition (born aligned via the ethical covenant).
   const composeDossier: JudgmentDossier =
     dossier ?? { primary_themes: [], factors: [], suppressed_techniques: [], limits: "" };
-  let reading = await runComposition(args, brief, composeDossier, hasNatal);
+  let reading = await runComposition(args, brief, composeDossier, hasNatal, covenant);
+
+  // Pass E — Ethical Alignment. Audits the finished prose against the full
+  // code(s) and revises once if materially misaligned. Runs before Pass C so the
+  // integrity gate covers any ethics rewrite. Never blocks delivery.
+  let ethicsReview: EthicsReview | null = null;
+  if (ethicsCodes.length) {
+    try {
+      const { review, adjustments } = await runEthicsReview(args, reading, ethicsCodes);
+      ethicsReview = review; // keep the audit even if a later revision fails
+      if (adjustments.length) {
+        reading = await runEthicsRevision(
+          args, brief, composeDossier, reading, adjustments, covenant
+        );
+        review.revised = true;
+      }
+    } catch (err) {
+      console.error("[pipeline] ethics pass failed, delivering draft as-is:", err);
+    }
+  }
 
   // Pass C — Verification (+ one revision if it fails). Never blocks delivery.
   let verification: VerificationReport | null = null;
@@ -415,5 +740,14 @@ export async function runReadingPipeline(args: PipelineArgs): Promise<PipelineRe
     console.error("[pipeline] verification pass failed, delivering draft as-is:", err);
   }
 
-  return { reading, dossier, verification, model: READING_MODEL };
+  // Pass N — Study Notes. Written last, over the finished reading. Purely
+  // additive; a failure just means no notebook this time.
+  let studyNotes: StudyNotes | null = null;
+  try {
+    studyNotes = await runStudyNotes(args, brief, composeDossier, reading);
+  } catch (err) {
+    console.error("[pipeline] study-notes pass failed, delivering without notes:", err);
+  }
+
+  return { reading, dossier, verification, ethicsReview, studyNotes, model: READING_MODEL };
 }

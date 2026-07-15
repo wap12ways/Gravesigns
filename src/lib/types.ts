@@ -132,6 +132,112 @@ export interface VerificationReport {
   issues: string[];
 }
 
+// ── Knowledge corpus ────────────────────────────────────────────────────────
+// A general, versioned store of the proprietary compilation of public reference
+// material the reading engine draws on. Ethics is the first kind; more kinds
+// (association standards, articles, webinar transcripts, published readings,
+// case data) are added WITHOUT schema or code changes — only new rows and,
+// optionally, new `KnowledgeKind` values.
+export type KnowledgeKind =
+  | "code_of_ethics"
+  // Reserved for later phases — listed so the type never has to be widened in a
+  // breaking way. Consumers should treat KnowledgeKind as open-ended.
+  | "association_standard"
+  | "article"
+  | "webinar_transcript"
+  | "published_reading"
+  | "case_data"
+  | (string & {});
+
+/**
+ * One document in the knowledge corpus. `content` is the canonical text
+ * (Markdown); `sections` optionally breaks it into addressable parts; anything
+ * a particular kind needs beyond these fields lives in `metadata`, so new kinds
+ * never require a schema change.
+ */
+export interface KnowledgeDocument {
+  slug: string;
+  kind: KnowledgeKind;
+  title: string;
+  /** Provenance — a URL or citation. */
+  source?: string | null;
+  /** Copyright / licence / rights notice, kept verbatim. */
+  attribution?: string | null;
+  /** Publisher's version marker, e.g. "Revised October 1998". */
+  version?: string | null;
+  status?: "active" | "archived" | "draft";
+  /** The full document text (Markdown). */
+  content: string;
+  /** Optional structured breakdown (e.g. chapters / clauses). */
+  sections?: KnowledgeSection[];
+  /**
+   * Kind-specific extras. For `code_of_ethics` this carries
+   * `operating_summary` — a short distillation injected at composition time.
+   */
+  metadata?: Record<string, unknown>;
+}
+
+export interface KnowledgeSection {
+  /** Stable identifier within the document, e.g. "A.4". */
+  ref: string;
+  heading: string;
+  body: string;
+}
+
+/**
+ * The output of Pass E (Ethical Alignment): a transparent record of how the
+ * drafted reading measured against the loaded Code(s) of Ethics, and what — if
+ * anything — was adjusted to bring it into alignment.
+ */
+export interface EthicsReview {
+  aligned: boolean;
+  /** Which codes were consulted, by slug, e.g. ["ncgr-code-of-ethics"]. */
+  codes: string[];
+  /** Specific tenets the reading touched, honoured, or risked breaching. */
+  concerns: EthicsConcern[];
+  /** Plain-language notes on what was changed to align the reading. */
+  adjustments: string[];
+  /** True when Pass E rewrote the draft (vs. passing it through unchanged). */
+  revised: boolean;
+}
+
+export interface EthicsConcern {
+  /** The code the clause belongs to, e.g. "NCGR". */
+  code: string;
+  /** The clause reference, e.g. "A.4" or "D.1". */
+  clause: string;
+  /** What in the reading engaged this clause. */
+  observation: string;
+  severity: "honored" | "minor" | "material";
+}
+
+/**
+ * Study notes — the working astrologer's private notebook on a chart, in the
+ * candid, technical, first-person shorthand a professional jots while studying
+ * (as opposed to the tender family-facing reading or the weighted dossier).
+ * These accumulate the practice's craft reasoning over time.
+ */
+export interface StudyNote {
+  /**
+   * The facet of the notebook. Open-ended so new lenses can be added without a
+   * breaking type change:
+   *   craft      — technique applied & why, notable configurations, judgment calls
+   *   research   — questions to investigate, cross-references, "go read X"
+   *   confidence — where the chart is strong vs. thin; methodological candor
+   */
+  category: "craft" | "research" | "confidence" | (string & {});
+  /** A short label for the note. */
+  heading: string;
+  /** The note body — a sentence or two of working shorthand. */
+  note: string;
+  /** Sources / cross-references the note points to, when any. */
+  refs?: string[];
+}
+
+export interface StudyNotes {
+  entries: StudyNote[];
+}
+
 export interface Reading {
   id: string;
   created_at: string;
@@ -147,6 +253,8 @@ export interface Reading {
   reading_markdown: string;
   dossier?: JudgmentDossier | null;
   natal_chart?: DeathChart | null;
+  ethics_review?: EthicsReview | null;
+  study_notes?: StudyNotes | null;
   model: string;
 }
 
@@ -167,6 +275,10 @@ export interface ReadingResponse {
   dossier?: JudgmentDossier | null;
   /** The natal chart, when birth details were supplied */
   natalChart?: DeathChart | null;
+  /** The Pass-E ethical-alignment record, when the pipeline produced one */
+  ethicsReview?: EthicsReview | null;
+  /** The practitioner's study notes, when the pipeline produced them */
+  studyNotes?: StudyNotes | null;
   /** true when saved to Supabase; false in demo/unconfigured mode */
   persisted: boolean;
 }
