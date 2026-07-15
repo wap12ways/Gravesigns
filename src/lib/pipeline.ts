@@ -38,7 +38,34 @@ import { computeLifespan } from "./analysis/lifespan";
 import { computeCrossAspects } from "./analysis/synastry";
 import { getCodesOfEthics, operatingSummary, codeLabel } from "./knowledge";
 
-export const READING_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
+/**
+ * Per-pass model selection. Every pass defaults to Opus 4.8 (the "showcase"
+ * profile) and is independently overridable by environment variable, so the
+ * pipeline can be tiered later (e.g. Sonnet for judgment, Haiku for the audits)
+ * without any code change. `ANTHROPIC_MODEL` sets the fallback default for all
+ * passes at once.
+ *
+ * Rewrites are deliberately NOT their own knob: both the ethics and the
+ * verification rewrite regenerate the family-facing reading, so they always run
+ * on the composition model. That keeps the finished prose at composition grade
+ * no matter how cheap the audits are tiered down to.
+ */
+const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-4-8";
+
+export const MODELS = {
+  judgment: process.env.ANTHROPIC_MODEL_JUDGMENT || DEFAULT_MODEL,
+  composition: process.env.ANTHROPIC_MODEL_COMPOSITION || DEFAULT_MODEL,
+  ethics: process.env.ANTHROPIC_MODEL_ETHICS || DEFAULT_MODEL,
+  verification: process.env.ANTHROPIC_MODEL_VERIFICATION || DEFAULT_MODEL,
+  studyNotes: process.env.ANTHROPIC_MODEL_STUDY_NOTES || DEFAULT_MODEL,
+} as const;
+
+/**
+ * The model that composed the reading — the meaningful single value to record
+ * on a saved reading (rewrites share it). Kept as a named export for the API
+ * route and any caller that persists a `model` field.
+ */
+export const READING_MODEL = MODELS.composition;
 
 export interface PipelineArgs {
   fullName: string;
@@ -144,7 +171,7 @@ const JUDGMENT_TOOL: Anthropic.Tool = {
 
 async function runJudgment(args: PipelineArgs, brief: string): Promise<JudgmentDossier> {
   const msg = await client().messages.create({
-    model: READING_MODEL,
+    model: MODELS.judgment,
     max_tokens: 4096,
     system: JUDGMENT_SYSTEM,
     tools: [JUDGMENT_TOOL],
@@ -283,7 +310,7 @@ async function runComposition(
   ethicalCovenant: string
 ): Promise<string> {
   const stream = client().messages.stream({
-    model: READING_MODEL,
+    model: MODELS.composition,
     max_tokens: 4608,
     system:
       COMPOSITION_SYSTEM +
@@ -341,7 +368,7 @@ async function runVerification(
   reading: string
 ): Promise<VerificationReport> {
   const msg = await client().messages.create({
-    model: READING_MODEL,
+    model: MODELS.verification,
     max_tokens: 1024,
     system: VERIFY_SYSTEM,
     tools: [VERIFY_TOOL],
@@ -377,7 +404,7 @@ async function runRevision(
   issues: string[]
 ): Promise<string> {
   const stream = client().messages.stream({
-    model: READING_MODEL,
+    model: MODELS.composition, // a rewrite of the reading — stays at composition grade
     max_tokens: 4096,
     system: REVISE_SYSTEM,
     messages: [
@@ -475,7 +502,7 @@ async function runEthicsReview(
   codes: KnowledgeDocument[]
 ): Promise<{ review: EthicsReview; adjustments: string[] }> {
   const msg = await client().messages.create({
-    model: READING_MODEL,
+    model: MODELS.ethics,
     max_tokens: 1536,
     system: ETHICS_SYSTEM,
     tools: [ETHICS_TOOL],
@@ -535,7 +562,7 @@ async function runEthicsRevision(
 You are revising an existing draft to resolve specific ETHICAL alignment notes from the practice's ethics steward. Apply each adjustment with a light hand: preserve the voice, the structure, and every accurate placement. Change only tone, framing, qualifiers, and care — never the astrology, and never introduce a placement not already present. Return the full corrected reading in Markdown, nothing else.`;
 
   const stream = client().messages.stream({
-    model: READING_MODEL,
+    model: MODELS.composition, // an ethics rewrite of the reading — stays at composition grade
     max_tokens: 4608,
     system,
     messages: [
@@ -621,7 +648,7 @@ async function runStudyNotes(
   reading: string
 ): Promise<StudyNotes> {
   const msg = await client().messages.create({
-    model: READING_MODEL,
+    model: MODELS.studyNotes,
     max_tokens: 2048,
     system: STUDY_NOTES_SYSTEM,
     tools: [STUDY_NOTES_TOOL],

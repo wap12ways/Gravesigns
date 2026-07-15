@@ -13,7 +13,7 @@ crosses — for people and beloved pets alike.
 
 GraveSigns casts a **true death chart** for the moment of passing (real
 planetary positions, aspects, houses, and lunar phase from a high-precision
-ephemeris) and composes a sophisticated, tender reading with **Claude Sonnet** —
+ephemeris) and composes a sophisticated, tender reading with **Claude** —
 written in the voice of a practitioner who has spent 20+ years with charts of
 transition.
 
@@ -22,7 +22,8 @@ transition.
 - **Next.js 15** (App Router) + **TypeScript**
 - **Tailwind CSS** + **shadcn/ui**-style components
 - **Supabase** (Postgres) for storing readings
-- **Anthropic Claude** (`claude-sonnet-5` by default) for reading generation
+- **Anthropic Claude** for reading generation — five passes, each on a model you
+  choose (defaults to `claude-opus-4-8` everywhere; per-pass overridable)
 - **Swiss Ephemeris** via **sweph-wasm** — the astrologer's gold-standard ephemeris (full DE431 `.se1` data files), compiled to WebAssembly, no native deps
 - Proper **time-zone resolution** (`tz-lookup` + `luxon`) with DST/historical rules
 - Premium form UX: a **searchable time-zone combobox** with live GMT-offset badges and a **place autocomplete** that pins exact coordinates
@@ -43,13 +44,13 @@ POST /api/readings
         Step 0  computeChartAnalysis()  — deterministic: dignities, Arabic lots,
                 aspect patterns, chart shape, fixed stars, the 8th/4th/12th
                 complex, mortal significators; + lifespan & cross-aspects if natal
-        Pass A  Judgment      — Sonnet distils a weighted, sourced dossier (JSON)
-        Pass B  Composition   — Sonnet composes the reading (born aligned to a
+        Pass A  Judgment      — Claude distils a weighted, sourced dossier (JSON)
+        Pass B  Composition   — Claude composes the reading (born aligned to a
                                 short ethical covenant loaded from the corpus)
-        Pass E  Ethical Alignment — Sonnet audits the prose against the loaded
+        Pass E  Ethical Alignment — Claude audits the prose against the loaded
                                 Code(s) of Ethics; one revision if misaligned
-        Pass C  Verification  — Sonnet audits it; one revision if it fails
-        Pass N  Study Notes   — Sonnet keeps the practitioner's working notebook
+        Pass C  Verification  — Claude audits it; one revision if it fails
+        Pass N  Study Notes   — Claude keeps the practitioner's working notebook
                                 on the chart (craft, research threads, limits)
    5. saveReading()            ──►  Supabase (no-op in demo mode)
         │
@@ -181,11 +182,26 @@ ephemeris and the Anthropic SDK) and streams each pass to avoid HTTP timeouts.
 
 ## ✦ Customizing the reading voice
 
-The three astrologer personas live in [`src/lib/pipeline.ts`](src/lib/pipeline.ts):
+The astrologer personas live in [`src/lib/pipeline.ts`](src/lib/pipeline.ts):
 `JUDGMENT_SYSTEM` (what evidence to weigh), `COMPOSITION_SYSTEM` (voice,
-integrity, and the section shape of every reading), and `VERIFY_SYSTEM` (the
-integrity audit). Edit them there to retune the craft. The deterministic
-astrology it all builds on lives in [`src/lib/analysis/`](src/lib/analysis).
+integrity, and the section shape of every reading), `ETHICS_SYSTEM` (the
+ethical-alignment audit), `VERIFY_SYSTEM` (the integrity audit), and
+`STUDY_NOTES_SYSTEM` (the practitioner's notebook). Edit them there to retune
+the craft. The deterministic astrology it all builds on lives in
+[`src/lib/analysis/`](src/lib/analysis).
+
+### Choosing a model per pass
+
+Each of the five passes picks its model from `MODELS` in
+[`src/lib/pipeline.ts`](src/lib/pipeline.ts), and every pass is independently
+overridable by environment variable — so the pipeline can be tiered for cost or
+latency without a code change. All passes default to **`claude-opus-4-8`**;
+`ANTHROPIC_MODEL` sets the default for all at once, and the per-pass vars
+(`ANTHROPIC_MODEL_JUDGMENT`, `…_COMPOSITION`, `…_ETHICS`, `…_VERIFICATION`,
+`…_STUDY_NOTES`) override individual passes. The ethics and verification
+**rewrites** always run on the composition model, so the finished reading stays
+at composition grade no matter how cheaply the audits are tiered. See
+[`.env.example`](.env.example) for a ready cost-tiered profile.
 
 ## ✦ On the astronomy
 
