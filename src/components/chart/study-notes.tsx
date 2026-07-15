@@ -48,10 +48,7 @@ export function StudyNotesPanel({ notes }: { notes: StudyNotes }) {
 
   return (
     <div>
-      <div className="text-[10px] uppercase tracking-[0.24em] text-gold/70">
-        The Practitioner&rsquo;s Notebook
-      </div>
-      <h3 className="mt-1 font-serif text-2xl gold-text">Study Notes</h3>
+      <h3 className="font-serif text-2xl gold-text">The Practitioner&rsquo;s Notebook</h3>
       <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
         The working notes taken while reading this chart — the craft behind the
         prose, the threads worth studying further, and an honest word on what the
@@ -67,7 +64,7 @@ export function StudyNotesPanel({ notes }: { notes: StudyNotes }) {
           return (
             <div key={key}>
               <div className="flex items-baseline gap-2">
-                <span className="text-xs uppercase tracking-[0.16em] text-gold-light/80">
+                <span className="font-serif text-base text-gold-light/90">
                   {lens.label}
                 </span>
                 {lens.hint && (

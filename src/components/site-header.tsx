@@ -13,14 +13,9 @@ export function SiteHeader() {
             height={1116}
             className="h-10 w-auto transition-transform group-hover:scale-105"
           />
-          <div className="leading-tight">
-            <span className="block font-serif text-lg tracking-wide gold-text">
-              GraveSigns
-            </span>
-            <span className="block text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
-              Truestherb
-            </span>
-          </div>
+          <span className="font-serif text-lg tracking-wide gold-text">
+            GraveSigns
+          </span>
         </Link>
         <nav className="flex items-center gap-6 text-sm">
           <Link

@@ -25,10 +25,7 @@ export function ReadingDisplay({ data }: { data: ReadingResponse }) {
         <CardContent className="pt-7">
           <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
             <div>
-              <div className="text-[10px] uppercase tracking-[0.24em] text-gold/70">
-                Death Chart · {data.subjectType === "pet" ? "Beloved Companion" : "In Memoriam"}
-              </div>
-              <h2 className="mt-1 font-serif text-3xl gold-text">
+              <h2 className="font-serif text-3xl gold-text">
                 {data.fullName}
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -44,8 +41,8 @@ export function ReadingDisplay({ data }: { data: ReadingResponse }) {
             )}
           </div>
 
-          <div className="mb-4 text-xs uppercase tracking-[0.14em] text-foreground/60">
-            The Calculated Sky
+          <div className="mb-4 font-serif text-lg text-foreground/75">
+            The calculated sky
           </div>
           <ChartPanel chart={data.chart} natalChart={data.natalChart} />
 
@@ -69,10 +66,10 @@ export function ReadingDisplay({ data }: { data: ReadingResponse }) {
         <CardContent className="pt-8">
           {/* Print-only header — the keepsake's title block */}
           <div className="print-only mb-8 text-center">
-            <div className="text-[11px] uppercase tracking-[0.24em] text-gold/70">
-              GraveSigns · Death Chart Reading
+            <div className="font-serif text-base italic text-foreground/60">
+              GraveSigns — a death chart reading for
             </div>
-            <h1 className="mt-2 font-serif text-3xl">{data.fullName}</h1>
+            <h1 className="mt-1 font-serif text-3xl">{data.fullName}</h1>
             <p className="mt-1 text-sm">
               Crossed {formatDate(data.dateOfDeath)}
               {data.timeOfDeath ? ` at ${data.timeOfDeath}` : ""}

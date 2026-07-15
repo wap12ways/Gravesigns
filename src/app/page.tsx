@@ -21,10 +21,6 @@ export default function Home() {
             className="mb-8 h-auto w-56 animate-fade-up drop-shadow-[0_0_45px_rgba(233,196,106,0.3)] sm:w-64"
           />
 
-          <span className="mb-5 inline-flex items-center gap-2 rounded-full border border-gold/20 bg-gold/5 px-4 py-1.5 text-[11px] uppercase tracking-[0.28em] text-gold-light/80">
-            Truestherb · Death Chart Readings
-          </span>
-
           <h1 className="max-w-3xl font-serif text-5xl leading-[1.05] tracking-tight sm:text-6xl md:text-7xl">
             The sky remembers
             <br />
