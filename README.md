@@ -44,7 +44,10 @@ POST /api/readings
                 aspect patterns, chart shape, fixed stars, the 8th/4th/12th
                 complex, mortal significators; + lifespan & cross-aspects if natal
         Pass A  Judgment      — Sonnet distils a weighted, sourced dossier (JSON)
-        Pass B  Composition   — Sonnet composes the reading from the dossier
+        Pass B  Composition   — Sonnet composes the reading (born aligned to a
+                                short ethical covenant loaded from the corpus)
+        Pass E  Ethical Alignment — Sonnet audits the prose against the loaded
+                                Code(s) of Ethics; one revision if misaligned
         Pass C  Verification  — Sonnet audits it; one revision if it fails
    5. saveReading()            ──►  Supabase (no-op in demo mode)
         │
@@ -83,7 +86,7 @@ src/
 │   └── ui/                        # button, input, textarea, label, card
 └── lib/
     ├── astrology.ts               # ephemeris → DeathChart
-    ├── pipeline.ts                # the three-pass reading pipeline
+    ├── pipeline.ts                # the reading pipeline (judgment→compose→ethics→verify)
     ├── analysis/                  # Step-0 deterministic engine
     │   ├── reference.ts           # source-verified traditional tables
     │   ├── dignities.ts / lots.ts / patterns.ts / fixedstars.ts
@@ -91,11 +94,16 @@ src/
     │   ├── lifespan.ts / synastry.ts   # natal (Tier-2) doctrine
     │   ├── serialize.ts           # analysis → evidence brief
     │   └── index.ts               # computeChartAnalysis()
+    ├── knowledge/                 # the reference corpus (ethics + future kinds)
+    │   ├── index.ts               # loadKnowledge() — Supabase w/ bundled fallback
+    │   └── documents/
+    │       └── ncgr-code-of-ethics.ts   # bundled, verbatim NCGR code
     ├── glyphs.ts                  # shared glyphs + element palette
     ├── supabase.ts                # persistence (graceful demo fallback)
     ├── markdown.ts                # tiny, safe MD → HTML
     └── types.ts
-supabase/schema.sql               # the readings table + RLS
+supabase/schema.sql               # readings + knowledge_documents tables + RLS
+supabase/seed/knowledge_documents.sql  # seeds the corpus (NCGR code of ethics)
 .env.example                      # environment variables
 ```
 
@@ -123,7 +131,11 @@ npm run dev
 
 1. Create a project at [supabase.com](https://supabase.com).
 2. Open **SQL Editor** and run [`supabase/schema.sql`](supabase/schema.sql).
-3. From **Project Settings → API**, copy into `.env.local`:
+3. Run [`supabase/seed/knowledge_documents.sql`](supabase/seed/knowledge_documents.sql)
+   to seed the knowledge corpus (the NCGR Code of Ethics). Optional — the app
+   ships with a bundled copy and falls back to it, but seeding makes the code
+   editable in the database without a redeploy.
+4. From **Project Settings → API**, copy into `.env.local`:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY` (server-only — never expose to the browser)
@@ -131,6 +143,25 @@ npm run dev
 The API routes write with the service-role key, so inserts succeed with RLS on.
 A public **read** policy is included so the gallery renders; tighten it for
 production.
+
+### The knowledge corpus & the ethical-alignment pass
+
+`knowledge_documents` is a general, versioned store of the practice's compiled
+reference material — the Code of Ethics is its first `kind`; later kinds
+(association standards, articles, webinar transcripts, published readings, case
+data) are added as **rows**, with no schema or code change. The reading engine
+reads it through one seam, [`src/lib/knowledge`](src/lib/knowledge), which loads
+active documents from Supabase and **falls back to the bundled copies** when the
+DB is unconfigured, empty, or lagging the schema — so a reading is never blocked.
+
+The reading pipeline consults it twice: a short **operating summary** of the
+code is folded into the composition pass so drafts are born aligned, and a
+dedicated **Pass E — Ethical Alignment** then audits the finished prose against
+the full code and revises it once if it is materially misaligned. Its verdict
+(which clauses were engaged, what was adjusted) is persisted on the reading as
+`ethics_review`. To retune what the engine aligns against, edit the
+`knowledge_documents` row (no deploy) or the bundled file — the text is loaded
+as data, never hardcoded into a prompt.
 
 ## ✦ Deploy to Vercel
 

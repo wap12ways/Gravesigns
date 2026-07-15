@@ -24,6 +24,7 @@ create table if not exists public.readings (
   reading_markdown  text not null,         -- the AI-composed reading
   dossier           jsonb,                 -- the Pass-A judgment dossier (nullable)
   natal_chart       jsonb,                 -- the natal chart when birth data given (nullable)
+  ethics_review     jsonb,                 -- the Pass-E ethical-alignment record (nullable)
   model             text not null default 'claude-sonnet-5'
 );
 
@@ -35,6 +36,54 @@ create index if not exists readings_created_at_idx
 -- dossier and natal_chart columns (safe to run repeatedly):
 alter table public.readings add column if not exists dossier jsonb;
 alter table public.readings add column if not exists natal_chart jsonb;
+alter table public.readings add column if not exists ethics_review jsonb;
+
+-- ─────────────────────────────────────────────────────────────
+-- Knowledge corpus
+-- A general, versioned store of the practice's compiled reference material —
+-- the proprietary compilation of public data the reading engine draws on. The
+-- Code of Ethics is the first `kind`; later phases add more kinds (association
+-- standards, articles, webinar transcripts, published readings, case data) as
+-- new ROWS, with no schema change. Kind-specific extras live in `metadata`, so
+-- new kinds never force a migration.
+-- ─────────────────────────────────────────────────────────────
+
+create table if not exists public.knowledge_documents (
+  id            uuid primary key default gen_random_uuid(),
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now(),
+
+  slug          text not null,              -- 'ncgr-code-of-ethics'
+  kind          text not null,              -- 'code_of_ethics', 'article', …
+  title         text not null,
+  source        text,                       -- URL or citation
+  attribution   text,                       -- copyright / licence / rights
+  version       text,                       -- publisher's version marker
+  status        text not null default 'active'
+                  check (status in ('active', 'archived', 'draft')),
+
+  content       text not null,              -- the full document text (Markdown)
+  sections      jsonb,                      -- optional structured breakdown
+  metadata      jsonb not null default '{}'::jsonb,
+
+  unique (slug, version)
+);
+
+create index if not exists knowledge_documents_kind_status_idx
+  on public.knowledge_documents (kind, status);
+
+-- The reading engine reads the corpus with the anon or service-role key, so a
+-- public read policy lets it (and the demo UI) load active documents.
+alter table public.knowledge_documents enable row level security;
+
+drop policy if exists "knowledge is publicly readable" on public.knowledge_documents;
+create policy "knowledge is publicly readable"
+  on public.knowledge_documents for select
+  using (true);
+
+-- Seed the corpus with the bundled reference documents (idempotent):
+--   \i supabase/seed/knowledge_documents.sql
+-- or paste that file into the SQL editor after this schema.
 
 -- ── Row Level Security ───────────────────────────────────────
 -- The API routes use the SERVICE ROLE key, which bypasses RLS, so

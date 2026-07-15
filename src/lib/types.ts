@@ -132,6 +132,85 @@ export interface VerificationReport {
   issues: string[];
 }
 
+// ── Knowledge corpus ────────────────────────────────────────────────────────
+// A general, versioned store of the proprietary compilation of public reference
+// material the reading engine draws on. Ethics is the first kind; more kinds
+// (association standards, articles, webinar transcripts, published readings,
+// case data) are added WITHOUT schema or code changes — only new rows and,
+// optionally, new `KnowledgeKind` values.
+export type KnowledgeKind =
+  | "code_of_ethics"
+  // Reserved for later phases — listed so the type never has to be widened in a
+  // breaking way. Consumers should treat KnowledgeKind as open-ended.
+  | "association_standard"
+  | "article"
+  | "webinar_transcript"
+  | "published_reading"
+  | "case_data"
+  | (string & {});
+
+/**
+ * One document in the knowledge corpus. `content` is the canonical text
+ * (Markdown); `sections` optionally breaks it into addressable parts; anything
+ * a particular kind needs beyond these fields lives in `metadata`, so new kinds
+ * never require a schema change.
+ */
+export interface KnowledgeDocument {
+  slug: string;
+  kind: KnowledgeKind;
+  title: string;
+  /** Provenance — a URL or citation. */
+  source?: string | null;
+  /** Copyright / licence / rights notice, kept verbatim. */
+  attribution?: string | null;
+  /** Publisher's version marker, e.g. "Revised October 1998". */
+  version?: string | null;
+  status?: "active" | "archived" | "draft";
+  /** The full document text (Markdown). */
+  content: string;
+  /** Optional structured breakdown (e.g. chapters / clauses). */
+  sections?: KnowledgeSection[];
+  /**
+   * Kind-specific extras. For `code_of_ethics` this carries
+   * `operating_summary` — a short distillation injected at composition time.
+   */
+  metadata?: Record<string, unknown>;
+}
+
+export interface KnowledgeSection {
+  /** Stable identifier within the document, e.g. "A.4". */
+  ref: string;
+  heading: string;
+  body: string;
+}
+
+/**
+ * The output of Pass E (Ethical Alignment): a transparent record of how the
+ * drafted reading measured against the loaded Code(s) of Ethics, and what — if
+ * anything — was adjusted to bring it into alignment.
+ */
+export interface EthicsReview {
+  aligned: boolean;
+  /** Which codes were consulted, by slug, e.g. ["ncgr-code-of-ethics"]. */
+  codes: string[];
+  /** Specific tenets the reading touched, honoured, or risked breaching. */
+  concerns: EthicsConcern[];
+  /** Plain-language notes on what was changed to align the reading. */
+  adjustments: string[];
+  /** True when Pass E rewrote the draft (vs. passing it through unchanged). */
+  revised: boolean;
+}
+
+export interface EthicsConcern {
+  /** The code the clause belongs to, e.g. "NCGR". */
+  code: string;
+  /** The clause reference, e.g. "A.4" or "D.1". */
+  clause: string;
+  /** What in the reading engaged this clause. */
+  observation: string;
+  severity: "honored" | "minor" | "material";
+}
+
 export interface Reading {
   id: string;
   created_at: string;
@@ -147,6 +226,7 @@ export interface Reading {
   reading_markdown: string;
   dossier?: JudgmentDossier | null;
   natal_chart?: DeathChart | null;
+  ethics_review?: EthicsReview | null;
   model: string;
 }
 
@@ -167,6 +247,8 @@ export interface ReadingResponse {
   dossier?: JudgmentDossier | null;
   /** The natal chart, when birth details were supplied */
   natalChart?: DeathChart | null;
+  /** The Pass-E ethical-alignment record, when the pipeline produced one */
+  ethicsReview?: EthicsReview | null;
   /** true when saved to Supabase; false in demo/unconfigured mode */
   persisted: boolean;
 }

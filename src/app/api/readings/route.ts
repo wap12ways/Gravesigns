@@ -3,6 +3,7 @@ import { computeDeathChart } from "@/lib/astrology";
 import { runReadingPipeline, READING_MODEL } from "@/lib/pipeline";
 import { saveReading, listReadings, isSupabaseConfigured } from "@/lib/supabase";
 import type {
+  EthicsReview,
   JudgmentDossier,
   ReadingRequest,
   ReadingResponse,
@@ -154,6 +155,7 @@ export async function POST(req: NextRequest) {
   //    (Step-0 analysis → judgment → composition → verification).
   let reading: string;
   let dossier: JudgmentDossier | null = null;
+  let ethicsReview: EthicsReview | null = null;
   try {
     const result = await runReadingPipeline({
       fullName,
@@ -168,6 +170,7 @@ export async function POST(req: NextRequest) {
     });
     reading = result.reading;
     dossier = result.dossier;
+    ethicsReview = result.ethicsReview;
   } catch (err) {
     console.error("Reading generation failed:", err);
     const message =
@@ -192,6 +195,7 @@ export async function POST(req: NextRequest) {
     model: READING_MODEL,
     dossier,
     natalChart,
+    ethicsReview,
   });
 
   const response: ReadingResponse = {
@@ -208,6 +212,7 @@ export async function POST(req: NextRequest) {
     model: READING_MODEL,
     dossier,
     natalChart,
+    ethicsReview,
     persisted: Boolean(id),
   };
 
