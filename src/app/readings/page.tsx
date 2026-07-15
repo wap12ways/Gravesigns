@@ -67,8 +67,8 @@ export default async function ReadingsPage() {
                 <Card className="h-full transition-transform hover:-translate-y-0.5 hover:border-gold/30">
                   <CardContent className="py-6">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] uppercase tracking-[0.2em] text-gold/70">
-                        {r.subject_type === "pet" ? "Companion" : "In Memoriam"}
+                      <span className="text-xs italic text-muted-foreground/70">
+                        {r.subject_type === "pet" ? "A beloved companion" : "In memoriam"}
                       </span>
                       <Moon className="h-4 w-4 text-gold-light/50" />
                     </div>

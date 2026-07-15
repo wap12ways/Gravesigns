@@ -15,8 +15,7 @@ export function DossierNotes({ dossier }: { dossier: JudgmentDossier }) {
 
   return (
     <div>
-      <div className="text-[10px] uppercase tracking-[0.24em] text-gold/70">The Astrologer&rsquo;s Casebook</div>
-      <h3 className="mt-1 font-serif text-2xl gold-text">The Evidence Beneath the Reading</h3>
+      <h3 className="font-serif text-2xl gold-text">The Astrologer&rsquo;s Casebook</h3>
       <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
         Before a word was written, each testimony in the chart was weighed and sourced.
         These are the strongest, in the order they carried.
