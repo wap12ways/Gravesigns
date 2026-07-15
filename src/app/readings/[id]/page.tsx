@@ -28,6 +28,10 @@ export default async function ReadingDetailPage({
     chart: row.chart,
     reading: row.reading_markdown,
     model: row.model,
+    dossier: row.dossier ?? null,
+    natalChart: row.natal_chart ?? null,
+    ethicsReview: row.ethics_review ?? null,
+    studyNotes: row.study_notes ?? null,
     persisted: true,
   };
 

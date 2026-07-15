@@ -29,6 +29,8 @@ import type {
   EthicsReview,
   EthicsConcern,
   KnowledgeDocument,
+  StudyNotes,
+  StudyNote,
 } from "./types";
 import { computeChartAnalysis } from "./analysis";
 import { analysisToText, natalContextToText } from "./analysis/serialize";
@@ -56,6 +58,7 @@ export interface PipelineResult {
   dossier: JudgmentDossier | null;
   verification: VerificationReport | null;
   ethicsReview: EthicsReview | null;
+  studyNotes: StudyNotes | null;
   model: string;
 }
 
@@ -556,6 +559,94 @@ You are revising an existing draft to resolve specific ETHICAL alignment notes f
   return text || reading;
 }
 
+/* ------------------------------------------------------------------ Pass N */
+/* Study Notes — the working astrologer's private notebook on this chart, in the
+ * candid technical shorthand a professional jots while studying. Distinct from
+ * the tender family reading (Pass B) and the weighted evidence dossier (Pass A):
+ * these are the margin notes — technique applied and why, notable configurations,
+ * questions worth researching, cross-references to tradition, and honest reads on
+ * where the chart is strong or thin. They accumulate the practice's craft
+ * reasoning over time. Additive and non-blocking: runs last, degrades to null. */
+
+const STUDY_NOTES_SYSTEM = `You are a professional astrologer keeping your own STUDY NOTEBOOK on a death chart you have just read. These notes are for your craft and your continued study — not for the grieving family. Write as a seasoned practitioner jots in the margin: candid, concise, technical, first-person shorthand.
+
+Draw ONLY on the chart frame, the evidence dossier, and the finished reading provided. Never invent a placement or number that is not there.
+
+Produce a spread of notes across these lenses (not every lens needs the same count; follow the chart):
+- craft — the technique you actually leaned on and WHY, notable or unusual configurations, the judgment calls you made (what you up- or down-weighted, and the reasoning). This is the bulk.
+- research — open questions this chart raises, cross-references to the tradition worth pulling ("cf. Valens Anthology III on the Moon's separations"; "check Lilly CA p.653 on the 8th ruler cadent"), patterns to watch for across future charts.
+- confidence — an honest methodological read: where the testimony was strong and concordant vs. thin or strained, what was suppressed and why, how much weight the verdict really carries.
+
+Keep each note tight — a sentence or two. Cite sources in refs where you can. This is a working instrument: precise about the astrology, unsentimental in tone, but never careless about a real person. Do not state or imply a cause, manner, date, or span of the death — even here.
+
+Call record_study_notes exactly once.`;
+
+const STUDY_NOTES_TOOL: Anthropic.Tool = {
+  name: "record_study_notes",
+  description: "Record the practitioner's study notes on the chart.",
+  input_schema: {
+    type: "object",
+    properties: {
+      entries: {
+        type: "array",
+        description: "The notebook entries, in the order you'd study them.",
+        items: {
+          type: "object",
+          properties: {
+            category: {
+              type: "string",
+              enum: ["craft", "research", "confidence"],
+              description: "The lens this note belongs to.",
+            },
+            heading: { type: "string", description: "A short label for the note." },
+            note: { type: "string", description: "A sentence or two of working shorthand." },
+            refs: {
+              type: "array",
+              items: { type: "string" },
+              description: "Sources / cross-references, when any.",
+            },
+          },
+          required: ["category", "heading", "note"],
+        },
+      },
+    },
+    required: ["entries"],
+  },
+};
+
+async function runStudyNotes(
+  args: PipelineArgs,
+  brief: string,
+  dossier: JudgmentDossier,
+  reading: string
+): Promise<StudyNotes> {
+  const msg = await client().messages.create({
+    model: READING_MODEL,
+    max_tokens: 2048,
+    system: STUDY_NOTES_SYSTEM,
+    tools: [STUDY_NOTES_TOOL],
+    tool_choice: { type: "tool", name: "record_study_notes" },
+    messages: [
+      {
+        role: "user",
+        content:
+          `SUBJECT\n${subjectLine(args)}\n\n` +
+          `CHART FRAME (authoritative)\n\`\`\`\n${brief}\n\`\`\`\n\n` +
+          `EVIDENCE DOSSIER\n\`\`\`\n${dossierToText(dossier)}\n\`\`\`\n\n` +
+          `THE FINISHED READING\n\`\`\`\n${reading}\n\`\`\`\n\nWrite your study notes now.`,
+      },
+    ],
+  });
+
+  const block = msg.content.find(
+    (b): b is Anthropic.ToolUseBlock =>
+      b.type === "tool_use" && b.name === "record_study_notes"
+  );
+  if (!block) return { entries: [] };
+  const raw = block.input as { entries?: StudyNote[] };
+  return { entries: (raw.entries ?? []) as StudyNote[] };
+}
+
 /* --------------------------------------------------------------- orchestrate */
 
 export async function runReadingPipeline(args: PipelineArgs): Promise<PipelineResult> {
@@ -622,5 +713,14 @@ export async function runReadingPipeline(args: PipelineArgs): Promise<PipelineRe
     console.error("[pipeline] verification pass failed, delivering draft as-is:", err);
   }
 
-  return { reading, dossier, verification, ethicsReview, model: READING_MODEL };
+  // Pass N — Study Notes. Written last, over the finished reading. Purely
+  // additive; a failure just means no notebook this time.
+  let studyNotes: StudyNotes | null = null;
+  try {
+    studyNotes = await runStudyNotes(args, brief, composeDossier, reading);
+  } catch (err) {
+    console.error("[pipeline] study-notes pass failed, delivering without notes:", err);
+  }
+
+  return { reading, dossier, verification, ethicsReview, studyNotes, model: READING_MODEL };
 }

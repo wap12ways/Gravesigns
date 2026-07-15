@@ -211,6 +211,33 @@ export interface EthicsConcern {
   severity: "honored" | "minor" | "material";
 }
 
+/**
+ * Study notes — the working astrologer's private notebook on a chart, in the
+ * candid, technical, first-person shorthand a professional jots while studying
+ * (as opposed to the tender family-facing reading or the weighted dossier).
+ * These accumulate the practice's craft reasoning over time.
+ */
+export interface StudyNote {
+  /**
+   * The facet of the notebook. Open-ended so new lenses can be added without a
+   * breaking type change:
+   *   craft      — technique applied & why, notable configurations, judgment calls
+   *   research   — questions to investigate, cross-references, "go read X"
+   *   confidence — where the chart is strong vs. thin; methodological candor
+   */
+  category: "craft" | "research" | "confidence" | (string & {});
+  /** A short label for the note. */
+  heading: string;
+  /** The note body — a sentence or two of working shorthand. */
+  note: string;
+  /** Sources / cross-references the note points to, when any. */
+  refs?: string[];
+}
+
+export interface StudyNotes {
+  entries: StudyNote[];
+}
+
 export interface Reading {
   id: string;
   created_at: string;
@@ -227,6 +254,7 @@ export interface Reading {
   dossier?: JudgmentDossier | null;
   natal_chart?: DeathChart | null;
   ethics_review?: EthicsReview | null;
+  study_notes?: StudyNotes | null;
   model: string;
 }
 
@@ -249,6 +277,8 @@ export interface ReadingResponse {
   natalChart?: DeathChart | null;
   /** The Pass-E ethical-alignment record, when the pipeline produced one */
   ethicsReview?: EthicsReview | null;
+  /** The practitioner's study notes, when the pipeline produced them */
+  studyNotes?: StudyNotes | null;
   /** true when saved to Supabase; false in demo/unconfigured mode */
   persisted: boolean;
 }

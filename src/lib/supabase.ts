@@ -4,6 +4,7 @@ import type {
   EthicsReview,
   JudgmentDossier,
   Reading,
+  StudyNotes,
   SubjectType,
 } from "./types";
 
@@ -50,6 +51,8 @@ interface SaveArgs {
   natalChart?: DeathChart | null;
   /** The Pass-E ethical-alignment record (optional; requires `ethics_review`) */
   ethicsReview?: EthicsReview | null;
+  /** The practitioner's study notes (optional; requires `study_notes`) */
+  studyNotes?: StudyNotes | null;
 }
 
 /** Returns the new row's id, or null when Supabase is not configured. */
@@ -75,12 +78,13 @@ export async function saveReading(args: SaveArgs): Promise<string | null> {
     dossier: args.dossier ?? null,
     natal_chart: args.natalChart ?? null,
     ethics_review: args.ethicsReview ?? null,
+    study_notes: args.studyNotes ?? null,
   };
 
   // Try the full row first; if the new columns don't exist yet on this database,
   // fall back to the base row so a reading is never lost to a schema lag.
   let res = await supabase.from("readings").insert(withExtras).select("id").single();
-  if (res.error && /dossier|natal_chart|ethics_review|column/i.test(res.error.message)) {
+  if (res.error && /dossier|natal_chart|ethics_review|study_notes|column/i.test(res.error.message)) {
     res = await supabase.from("readings").insert(base).select("id").single();
   }
   if (res.error) {

@@ -49,6 +49,8 @@ POST /api/readings
         Pass E  Ethical Alignment — Sonnet audits the prose against the loaded
                                 Code(s) of Ethics; one revision if misaligned
         Pass C  Verification  — Sonnet audits it; one revision if it fails
+        Pass N  Study Notes   — Sonnet keeps the practitioner's working notebook
+                                on the chart (craft, research threads, limits)
    5. saveReading()            ──►  Supabase (no-op in demo mode)
         │
         ▼
@@ -81,12 +83,12 @@ src/
 │   │   ├── chart-panel.tsx        # tabbed orchestrator (client)
 │   │   ├── chart-wheel.tsx        # SVG wheel + bi-wheel
 │   │   ├── dignities-table.tsx / aspectarian.tsx / mortality-panel.tsx
-│   │   ├── moon-phase.tsx / dossier-notes.tsx
+│   │   ├── moon-phase.tsx / dossier-notes.tsx / study-notes.tsx
 │   ├── logo.tsx / starfield.tsx / site-header.tsx
 │   └── ui/                        # button, input, textarea, label, card
 └── lib/
     ├── astrology.ts               # ephemeris → DeathChart
-    ├── pipeline.ts                # the reading pipeline (judgment→compose→ethics→verify)
+    ├── pipeline.ts                # the reading pipeline (judgment→compose→ethics→verify→notes)
     ├── analysis/                  # Step-0 deterministic engine
     │   ├── reference.ts           # source-verified traditional tables
     │   ├── dignities.ts / lots.ts / patterns.ts / fixedstars.ts

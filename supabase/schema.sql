@@ -25,6 +25,7 @@ create table if not exists public.readings (
   dossier           jsonb,                 -- the Pass-A judgment dossier (nullable)
   natal_chart       jsonb,                 -- the natal chart when birth data given (nullable)
   ethics_review     jsonb,                 -- the Pass-E ethical-alignment record (nullable)
+  study_notes       jsonb,                 -- the practitioner's study notes (nullable)
   model             text not null default 'claude-sonnet-5'
 );
 
@@ -37,6 +38,7 @@ create index if not exists readings_created_at_idx
 alter table public.readings add column if not exists dossier jsonb;
 alter table public.readings add column if not exists natal_chart jsonb;
 alter table public.readings add column if not exists ethics_review jsonb;
+alter table public.readings add column if not exists study_notes jsonb;
 
 -- ─────────────────────────────────────────────────────────────
 -- Knowledge corpus

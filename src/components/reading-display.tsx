@@ -2,6 +2,7 @@ import type { ReadingResponse } from "@/lib/types";
 import { renderMarkdown } from "@/lib/markdown";
 import { ChartPanel } from "./chart/chart-panel";
 import { DossierNotes } from "./chart/dossier-notes";
+import { StudyNotesPanel } from "./chart/study-notes";
 import { PrintButton } from "./print-button";
 import { Card, CardContent } from "./ui/card";
 
@@ -97,6 +98,14 @@ export function ReadingDisplay({ data }: { data: ReadingResponse }) {
         <Card className="no-print">
           <CardContent className="pt-7">
             <DossierNotes dossier={data.dossier} />
+          </CardContent>
+        </Card>
+      )}
+
+      {data.studyNotes && data.studyNotes.entries.length > 0 && (
+        <Card className="no-print">
+          <CardContent className="pt-7">
+            <StudyNotesPanel notes={data.studyNotes} />
           </CardContent>
         </Card>
       )}

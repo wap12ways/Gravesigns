@@ -7,6 +7,7 @@ import type {
   JudgmentDossier,
   ReadingRequest,
   ReadingResponse,
+  StudyNotes,
   SubjectType,
 } from "@/lib/types";
 
@@ -156,6 +157,7 @@ export async function POST(req: NextRequest) {
   let reading: string;
   let dossier: JudgmentDossier | null = null;
   let ethicsReview: EthicsReview | null = null;
+  let studyNotes: StudyNotes | null = null;
   try {
     const result = await runReadingPipeline({
       fullName,
@@ -171,6 +173,7 @@ export async function POST(req: NextRequest) {
     reading = result.reading;
     dossier = result.dossier;
     ethicsReview = result.ethicsReview;
+    studyNotes = result.studyNotes;
   } catch (err) {
     console.error("Reading generation failed:", err);
     const message =
@@ -196,6 +199,7 @@ export async function POST(req: NextRequest) {
     dossier,
     natalChart,
     ethicsReview,
+    studyNotes,
   });
 
   const response: ReadingResponse = {
@@ -213,6 +217,7 @@ export async function POST(req: NextRequest) {
     dossier,
     natalChart,
     ethicsReview,
+    studyNotes,
     persisted: Boolean(id),
   };
 
