@@ -1,6 +1,6 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Moon, Compass, HeartHandshake } from "lucide-react";
-import { GraveSignsMark } from "@/components/logo";
 import { Starfield } from "@/components/starfield";
 import { ReadingForm } from "@/components/reading-form";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,14 @@ export default function Home() {
       <section className="relative overflow-hidden">
         <Starfield />
         <div className="container relative flex flex-col items-center px-6 pb-16 pt-20 text-center sm:pt-28">
-          <GraveSignsMark className="mb-8 h-28 w-32 animate-fade-up drop-shadow-[0_0_35px_rgba(233,196,106,0.25)]" />
+          <Image
+            src="/logo.png"
+            alt="GraveSigns"
+            width={1200}
+            height={1116}
+            priority
+            className="mb-8 h-auto w-56 animate-fade-up drop-shadow-[0_0_45px_rgba(233,196,106,0.3)] sm:w-64"
+          />
 
           <span className="mb-5 inline-flex items-center gap-2 rounded-full border border-gold/20 bg-gold/5 px-4 py-1.5 text-[11px] uppercase tracking-[0.28em] text-gold-light/80">
             Truestherb · Death Chart Readings
