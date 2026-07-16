@@ -45,10 +45,14 @@ POST /api/readings
                 aspect patterns, chart shape, fixed stars, the 8th/4th/12th
                 complex, mortal significators; + lifespan & cross-aspects if natal
         Pass A  Judgment      — Claude distils a weighted, sourced dossier (JSON)
+        Pass S  Synthesis     — Claude turns the dossier into an explicit reading
+                                plan (3–5 core themes + narrative arc), the way a
+                                practitioner preps before a session
         Pass B  Composition   — Claude composes the reading (born aligned to a
-                                short ethical covenant, and deepened by the
-                                interpretive delineations retrieved for the
-                                factors present in this chart)
+                                short ethical covenant, built on the reading plan,
+                                and deepened by the interpretive delineations and
+                                public-domain passages retrieved for this chart;
+                                natal readings also pull natal-framed delineations)
         Pass E  Ethical Alignment — Claude audits the prose against the loaded
                                 Code(s) of Ethics; one revision if misaligned
         Pass C  Verification  — Claude audits it; one revision if it fails

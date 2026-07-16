@@ -132,6 +132,30 @@ export interface VerificationReport {
   issues: string[];
 }
 
+/**
+ * One core theme in the reading plan (Pass S — Synthesis). A professional
+ * astrologer, in the hours of prep before a session, distils the chart into a
+ * handful of themes the reading must carry — each supported by several concordant
+ * testimonies. This is that plan, made explicit for the composer to build on.
+ */
+export interface ReadingTheme {
+  /** The theme in a phrase, e.g. "A crossing held in depth and surrender". */
+  title: string;
+  /** The concordant testimonies that support it (placements, contacts, lots). */
+  threads: string[];
+  /** How to weight and voice it in the reading. */
+  emphasis: string;
+}
+
+export interface ReadingPlan {
+  /** The 3–5 core themes the reading is built around. */
+  themes: ReadingTheme[];
+  /** The narrative arc — the order and movement the reading should follow. */
+  arc: string;
+  /** What to touch only lightly or leave unsaid (never cause/manner/date/span). */
+  hold_back: string;
+}
+
 // ── Knowledge corpus ────────────────────────────────────────────────────────
 // A general, versioned store of the proprietary compilation of public reference
 // material the reading engine draws on. Ethics is the first kind; more kinds

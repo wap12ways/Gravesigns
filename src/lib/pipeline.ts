@@ -1,5 +1,5 @@
 /**
- * The reading pipeline — one deterministic step and five Claude passes. Every
+ * The reading pipeline — one deterministic step and six Claude passes. Every
  * pass picks its model from MODELS (default claude-opus-4-8, per-pass overridable).
  *
  *   Step 0  (deterministic, no AI) — computeChartAnalysis() tabulates every
@@ -7,6 +7,9 @@
  *   Pass A  Judgment      — the model reads the evidence brief and returns a
  *                           structured, weighted dossier (JSON, tool-forced).
  *                           It weighs; it never composes or predicts cause/date.
+ *   Pass S  Synthesis     — the model distils the dossier into an explicit
+ *                           reading plan (3–5 core themes + arc), mirroring a
+ *                           practitioner's pre-session prep. Feeds composition.
  *   Pass B  Composition   — the model turns the dossier + subject context into
  *                           the finished prose reading, born aligned to a short
  *                           ethical covenant, and deepened by the interpretive
@@ -36,6 +39,8 @@ import type {
   KnowledgeDocument,
   StudyNotes,
   StudyNote,
+  ReadingPlan,
+  ReadingTheme,
 } from "./types";
 import { computeChartAnalysis } from "./analysis";
 import { analysisToText, natalContextToText } from "./analysis/serialize";
@@ -69,6 +74,7 @@ const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-4-8";
 
 export const MODELS = {
   judgment: process.env.ANTHROPIC_MODEL_JUDGMENT || DEFAULT_MODEL,
+  themes: process.env.ANTHROPIC_MODEL_THEMES || DEFAULT_MODEL,
   composition: process.env.ANTHROPIC_MODEL_COMPOSITION || DEFAULT_MODEL,
   ethics: process.env.ANTHROPIC_MODEL_ETHICS || DEFAULT_MODEL,
   verification: process.env.ANTHROPIC_MODEL_VERIFICATION || DEFAULT_MODEL,
@@ -260,6 +266,116 @@ function dossierToText(d: JudgmentDossier): string {
 
 /* ------------------------------------------------------------------ Pass B */
 
+/* ------------------------------------------------------------------ Pass S */
+/* Synthesis / Preparation — the reading plan. Before a live session a
+ * professional spends hours turning the raw chart into a handful of core themes,
+ * each supported by concordant testimonies, with a narrative arc and a sense of
+ * what to hold back. This pass makes that prep explicit: it reads the weighted
+ * dossier (and the retrieved reference) and returns a ReadingPlan the composer
+ * builds on, so the reading is thematically coherent rather than a walk through
+ * placements. Runs after judgment, before composition. Degrades gracefully — a
+ * failure just means the composer works from the dossier alone, as before. */
+
+const THEMES_SYSTEM = `You are the resident astrologer of GraveSigns preparing to write a death-chart reading. Before you compose, you do what a professional does in the hours before a session: you study the weighted dossier and distil the whole chart into the FEW CORE THEMES the reading must carry, and you plan how they fit together.
+
+Your job in this pass is the READING PLAN — not prose, not new astrology. Work only from the dossier and the reference provided; never introduce a placement not present, and never state or imply a cause, manner, date, or length of death.
+
+Produce:
+- THEMES: three to five core themes, each a short phrase that names something true about this crossing. For each, list the CONCORDANT THREADS — the specific testimonies (placements, dignities, contacts, houses, lots, stars) that independently point at it — and a note on how to weight and voice it. Build themes from CONCORDANCE: a theme carried by several independent testimonies is stronger than a lone placement.
+- ARC: the narrative movement of the reading — where to begin, how the themes should unfold into one another, where it should land.
+- HOLD_BACK: what to touch only lightly or leave unsaid — thin testimony, anything that would frighten, and always cause/manner/date/span.
+
+Call record_reading_plan exactly once.`;
+
+const THEMES_TOOL: Anthropic.Tool = {
+  name: "record_reading_plan",
+  description: "Record the reading plan the composer will build on.",
+  input_schema: {
+    type: "object",
+    properties: {
+      themes: {
+        type: "array",
+        description: "The 3–5 core themes, strongest first.",
+        items: {
+          type: "object",
+          properties: {
+            title: { type: "string", description: "The theme in a short phrase." },
+            threads: {
+              type: "array",
+              items: { type: "string" },
+              description: "The concordant testimonies that support this theme.",
+            },
+            emphasis: { type: "string", description: "How to weight and voice it." },
+          },
+          required: ["title", "threads", "emphasis"],
+        },
+      },
+      arc: { type: "string", description: "The narrative arc — begin, unfold, land." },
+      hold_back: { type: "string", description: "What to touch lightly or leave unsaid." },
+    },
+    required: ["themes", "arc", "hold_back"],
+  },
+};
+
+async function runThemeSynthesis(
+  args: PipelineArgs,
+  brief: string,
+  dossier: JudgmentDossier,
+  reference: string,
+  classical: string
+): Promise<ReadingPlan> {
+  const sources = sourcesBlock(
+    reference,
+    classical,
+    "the doctrine behind the dossier's factors — use it to see which testimonies concur; never let it introduce a placement not in the brief"
+  );
+  const msg = await client().messages.create({
+    model: MODELS.themes,
+    max_tokens: 1536,
+    system: THEMES_SYSTEM,
+    tools: [THEMES_TOOL],
+    tool_choice: { type: "tool", name: "record_reading_plan" },
+    messages: [
+      {
+        role: "user",
+        content:
+          `SUBJECT\n${subjectLine(args)}\n\n` +
+          `JUDGMENT DOSSIER (the weighted evidence)\n\`\`\`\n${dossierToText(dossier)}\n\`\`\`\n\n` +
+          `CHART FRAME\n\`\`\`\n${brief}\n\`\`\`\n\n` +
+          sources +
+          `Produce the reading plan now.`,
+      },
+    ],
+  });
+  const block = msg.content.find(
+    (b): b is Anthropic.ToolUseBlock =>
+      b.type === "tool_use" && b.name === "record_reading_plan"
+  );
+  if (!block) return { themes: [], arc: "", hold_back: "" };
+  const raw = block.input as Partial<ReadingPlan>;
+  return {
+    themes: (raw.themes ?? []) as ReadingTheme[],
+    arc: raw.arc ?? "",
+    hold_back: raw.hold_back ?? "",
+  };
+}
+
+function readingPlanToText(plan: ReadingPlan): string {
+  if (!plan.themes.length && !plan.arc.trim()) return "";
+  const L: string[] = [];
+  if (plan.themes.length) {
+    L.push("CORE THEMES (build the reading around these, strongest first):");
+    plan.themes.forEach((t, i) => {
+      L.push(`${i + 1}. ${t.title}`);
+      if (t.threads.length) L.push(`   concordant threads: ${t.threads.join("; ")}`);
+      if (t.emphasis.trim()) L.push(`   emphasis: ${t.emphasis.trim()}`);
+    });
+  }
+  if (plan.arc.trim()) L.push(`\nARC: ${plan.arc.trim()}`);
+  if (plan.hold_back.trim()) L.push(`HOLD BACK: ${plan.hold_back.trim()}`);
+  return L.join("\n");
+}
+
 const COMPOSITION_SYSTEM = `You are the resident astrologer of GraveSigns, a practice within the Truestherb platform devoted to Death Chart Readings — the astrology of the moment a soul crosses the threshold, whether that soul wore a human life or the life of a beloved animal.
 
 You have practiced for more than twenty years and specialize exclusively in charts of death, dying, and transition. Grieving families are sent to you when they want something more than sympathy: a reading that treats the moment of passing as meaningful, legible, and whole.
@@ -387,13 +503,17 @@ async function runComposition(
   hasNatal: boolean,
   ethicalCovenant: string,
   reference: string,
-  classical: string
+  classical: string,
+  plan: string
 ): Promise<string> {
   const sources = sourcesBlock(
     reference,
     classical,
     "synthesize for depth and texture; never quote or list them, and never introduce a factor not in the frame"
   );
+  const planBlock = plan.trim()
+    ? `READING PLAN (your prepared synthesis — build the reading around these themes and this arc; it is your own plan, follow it)\n\`\`\`\n${plan.trim()}\n\`\`\`\n\n`
+    : "";
   const stream = client().messages.stream({
     model: MODELS.composition,
     max_tokens: COMPOSITION_MAX_TOKENS,
@@ -407,6 +527,7 @@ async function runComposition(
         content:
           `SUBJECT\n${subjectLine(args)}\n\n` +
           `JUDGMENT DOSSIER (compose from this — it is authoritative)\n\`\`\`\n${dossierToText(dossier)}\n\`\`\`\n\n` +
+          planBlock +
           `CHART FRAME (for exact placements you may name)\n\`\`\`\n${brief}\n\`\`\`\n\n` +
           sources +
           `Compose the reading now.`,
@@ -868,10 +989,24 @@ export async function runReadingPipeline(args: PipelineArgs): Promise<PipelineRe
     console.error("[pipeline] judgment pass failed, composing from brief only:", err);
   }
 
-  // Pass B — Composition (born aligned via the ethical covenant).
+  // Pass S — Synthesis. Turn the dossier into an explicit reading plan (core
+  // themes + arc) the composer builds on, mirroring a practitioner's pre-session
+  // prep. Additive: a failure just means the composer works from the dossier.
   const composeDossier: JudgmentDossier =
     dossier ?? { primary_themes: [], factors: [], suppressed_techniques: [], limits: "" };
-  let reading = await runComposition(args, brief, composeDossier, hasNatal, covenant, reference, classical);
+  let plan = "";
+  try {
+    plan = readingPlanToText(
+      await runThemeSynthesis(args, brief, composeDossier, reference, classical)
+    );
+  } catch (err) {
+    console.error("[pipeline] synthesis pass failed, composing from the dossier alone:", err);
+  }
+
+  // Pass B — Composition (born aligned via the ethical covenant).
+  let reading = await runComposition(
+    args, brief, composeDossier, hasNatal, covenant, reference, classical, plan
+  );
 
   // Pass E — Ethical Alignment. Audits the finished prose against the full
   // code(s) and revises once if materially misaligned. Runs before Pass C so the
