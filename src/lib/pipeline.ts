@@ -78,10 +78,10 @@ export const READING_MODEL = MODELS.composition;
 /**
  * Token ceiling for every pass that emits the full family-facing reading —
  * the composition itself and the two rewrites (ethics, verification). Sized for
- * the deepened section architecture (~1400–2000 words, ~10 sections, up to 13
+ * the deepened section architecture (~1800–2600 words, ~10 sections, up to 13
  * with a nativity) with headroom, so a rich reading is never truncated.
  */
-const COMPOSITION_MAX_TOKENS = 6656;
+const COMPOSITION_MAX_TOKENS = 8192;
 
 export interface PipelineArgs {
   fullName: string;
@@ -258,9 +258,15 @@ INTEGRITY
 - Weave technique into meaning — don't list "Moon in Scorpio, 8th house," say what the soul's vehicle passing through that water carries.
 - When houses/angles were absent, lean gracefully on signs, dignities, lots by sign, aspects, and the Moon; never fabricate an angle.
 
-DEPTH — this reading must feel like an unhurried in-person session, not a summary. Give each major section TWO to FOUR substantial paragraphs; never settle for a single thin one. Lead with the whole and then descend into the particular. Weave the interpretive reference and the tradition into meaning; hold contradictions rather than flattening them; let concordant testimonies build. Earn the length with texture and tenderness, not with repetition or filler.
+DEPTH — this reading must feel like a long, unhurried in-person session, not a summary. Give each major section TWO to FOUR substantial paragraphs; never settle for a single thin one. Lead with the whole and then descend into the particular.
 
-STRUCTURE (Markdown; "## " for sections, "### " for sub-labels). ~1400–2000 words:
+- NAME the real placements as you interpret them — the sign, the house, the dignity, the specific aspect or contact — and then say what each MEANS for this soul. Precision about the astrology is what makes the tenderness land.
+- Build each theme from MORE THAN ONE testimony. When several factors concur — a significator, its house, an aspect, a lot, a fixed star all pointing the same way — name that concordance explicitly and let the agreement carry weight. This is the heart of the craft.
+- Draw fully on the interpretive reference and the primary sources for the factors present: the death-house occupants, the luminary–malefic contacts, the ruling hand, the karmic axis. These are the meat of the reading — do not gesture at them, inhabit them.
+- Hold contradictions rather than flattening them; a soul, and a sky, can carry opposite truths at once.
+- Earn the length with texture, specificity, and tenderness — never with repetition, hedging, or filler.
+
+STRUCTURE (Markdown; "## " for sections, "### " for sub-labels). ~1800–2600 words:
 
 ## The Threshold
 Two or three arresting sentences naming the person and the essential signature of their crossing. Set the whole reading's key here.
@@ -275,7 +281,7 @@ The Moon (and Sun) by sign, dignity, and house/angle if present — the spiritua
 The planet that governs this sky — the ruler of the Ascendant, or (when angles are absent) the almuten of the Ascendant degree or the chart's final dispositor — read as the hand that guided the passage. Where the chart offers no angle, lean gracefully on the dispositor or almuten by sign; never fabricate an Ascendant.
 
 ## Thresholds and Guardians
-The mortal significators and the 8th/4th/12th complex — Saturn, Pluto, the Nodes, the ruler of the 8th, the 4th as the place of rest, the 12th as the hidden approach — and the death-lot(s), read as meaning and as guardianship, never as cause or manner.
+The heart of the death reading, and usually its fullest section. Weave the 8th/4th/12th complex — any significator TENANTING those houses (a body in the 8th, 4th, or 12th is the most direct testimony the chart offers), the ruler of the 8th, the 4th as the place of rest, the 12th as the hidden approach — together with the mortal significators (Saturn, Mars, Pluto, the luminaries, the Nodes), any hard luminary–malefic contact, and the death-lot(s). Name where these concur. Read all of it as meaning and as guardianship — never as a cause, a manner, or a moment of death.
 
 ## The Karmic Axis
 The lunar Nodes: the South Node as what is laid down at the gate, the familiar released; the North Node as the direction the soul faced as it crossed. Include any planet conjunct the nodes. (Omit this section only if the chart frame shows no nodal testimony.)
