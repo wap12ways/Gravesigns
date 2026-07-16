@@ -27,22 +27,25 @@ import { CLASSICAL_PASSAGES } from "./documents/classical-passages";
 // The families the retrieval can emit and the corpus is expected to cover.
 const COVERED_FAMILIES: DelineationEntry["family"][] = [
   "moon", "sun", "phase", "sect", "element", "modality", "shape",
-  "significator", "ruler", "dignity", "aspect", "pattern", "house", "lot", "star",
+  "significator", "ruler", "occupant", "dignity", "aspect", "pair", "pattern",
+  "condition", "house", "lot", "star",
 ];
 
 // Every entry's key prefix must map to its declared family.
 const PREFIX_FAMILY: Record<string, DelineationEntry["family"]> = {
   moon: "moon", sun: "sun", phase: "phase", sect: "sect", element: "element",
   modality: "modality", shape: "shape", significator: "significator",
-  ruler: "ruler", dignity: "dignity", aspect: "aspect", pattern: "pattern",
+  ruler: "ruler", occupant: "occupant", dignity: "dignity", aspect: "aspect",
+  pair: "pair", pattern: "pattern", condition: "condition",
   house: "house", lot: "lot", star: "star",
 };
 
 // Spine-first priority the selection ranks by. The sequence of families in any
 // result must be a subsequence of this order.
 const FAMILY_PRIORITY: DelineationEntry["family"][] = [
-  "moon", "phase", "ruler", "significator", "dignity", "aspect", "pattern",
-  "house", "lot", "star", "shape", "sun", "element", "modality", "sect",
+  "moon", "phase", "ruler", "significator", "occupant", "dignity", "aspect",
+  "pair", "pattern", "condition", "house", "lot", "star", "shape", "sun",
+  "element", "modality", "sect",
 ];
 
 /** A richly-populated synthetic chart that lights up most factor families. */
@@ -66,7 +69,7 @@ function makeChart(over: Partial<DeathChart> = {}): DeathChart {
       { name: "Venus", longitude: 160, sign: "Virgo", degreeInSign: 10, house: 3, retrograde: false, speed: 1 },
       { name: "Saturn", longitude: 300, sign: "Aquarius", degreeInSign: 0, house: 8, retrograde: false, speed: 0.05 },
       { name: "Mars", longitude: 10, sign: "Aries", degreeInSign: 10, house: 10, retrograde: false, speed: 0.5 },
-      { name: "Pluto", longitude: 295, sign: "Capricorn", degreeInSign: 25, house: 7, retrograde: false, speed: 0.01 },
+      { name: "Pluto", longitude: 295, sign: "Capricorn", degreeInSign: 25, house: 7, retrograde: true, speed: -0.01 },
       { name: "Mean Node", longitude: 80, sign: "Gemini", degreeInSign: 20, house: 12, retrograde: true, speed: -0.05 },
     ],
     aspects: [
@@ -106,14 +109,16 @@ function makeAnalysis(over: Partial<ChartAnalysis> = {}): ChartAnalysis {
     ],
     death: {
       houses: [
-        { house: 8, role: "death" },
-        { house: 4, role: "grave" },
-        { house: 12, role: "undoing" },
+        { house: 8, role: "death", occupants: ["Saturn", "Pluto"] },
+        { house: 4, role: "grave", occupants: [] },
+        { house: 12, role: "undoing", occupants: ["Mean Node"] },
       ],
       mortalSignificators: [
         { name: "Saturn" }, { name: "Mars" }, { name: "Moon" }, { name: "Sun" }, { name: "Pluto" },
       ],
-      anaretic: [],
+      anaretic: [
+        { body: "Saturn", degreeInSign: 29.5, kind: "anaretic (29°)", note: "" },
+      ],
       maleficContacts: [
         { malefic: "Saturn", body: "Sun", aspect: "Opposition", orb: 1 },
         { malefic: "Mars", body: "Moon", aspect: "Square", orb: 2 },
@@ -175,7 +180,10 @@ describe("activeFactorKeys", () => {
       "significator:Saturn", "significator:Moon", "significator:Nodes",
       "dignity:fall", "dignity:domicile",
       "aspect:Saturn-hard", "aspect:Mars-hard", "aspect:Jupiter-soft", "aspect:Venus-soft",
+      "pair:Saturn-Sun", "pair:Mars-Moon",
       "pattern:Grand Trine", "pattern:T-Square",
+      "occupant:8:Saturn", "occupant:8:Pluto",
+      "condition:retrograde", "condition:anaretic",
       "house:8", "house:4", "house:12",
       "lot:Part of Fortune", "lot:Lot of Death",
       "star:Algol", "star:Spica",

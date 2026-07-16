@@ -181,9 +181,12 @@ export interface DelineationEntry {
     | "shape"
     | "significator"
     | "ruler"
+    | "occupant"
     | "dignity"
     | "aspect"
+    | "pair"
     | "pattern"
+    | "condition"
     | "house"
     | "lot"
     | "star";

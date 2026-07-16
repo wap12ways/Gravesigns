@@ -220,14 +220,33 @@ export function activeFactorKeys(chart: DeathChart, analysis: ChartAnalysis): Se
     if (e.peregrine) keys.add("dignity:peregrine");
   }
 
-  // Hard contacts from the malefics to a luminary or angle — surfaced per malefic.
+  // Hard contacts from the malefics to a luminary or angle — surfaced per malefic,
+  // and, when the other end is a luminary, as a specific luminary–malefic pair.
   for (const c of analysis.death.maleficContacts) {
     if (c.malefic === "Saturn" || c.malefic === "Mars" || c.malefic === "Pluto") {
       keys.add(`aspect:${c.malefic}-hard`);
+      if (c.body === "Sun" || c.body === "Moon") keys.add(`pair:${c.malefic}-${c.body}`);
     }
   }
 
-  for (const h of analysis.death.houses) keys.add(`house:${h.house}`);
+  // Chart conditions: a retrograde death-significator, and anaretic (29°) or
+  // cusp (0°) degree flags surfaced by the death-factor engine.
+  const SIGNIFICATOR_NAMES = new Set(
+    analysis.death.mortalSignificators.map((m) => m.name)
+  );
+  if (chart.planets.some((p) => p.retrograde && SIGNIFICATOR_NAMES.has(p.name))) {
+    keys.add("condition:retrograde");
+  }
+  for (const a of analysis.death.anaretic) {
+    if (a.kind.startsWith("anaretic")) keys.add("condition:anaretic");
+    else if (a.kind.startsWith("cusp")) keys.add("condition:cusp");
+  }
+
+  for (const h of analysis.death.houses) {
+    keys.add(`house:${h.house}`);
+    // Significators tenanting a death house — the most direct death testimony.
+    for (const occ of h.occupants ?? []) keys.add(`occupant:${h.house}:${occ}`);
+  }
 
   for (const lot of analysis.lots) {
     if (/^Part of Fortune/.test(lot.name)) keys.add("lot:Part of Fortune");
@@ -245,17 +264,20 @@ const FAMILY_RANK: Record<DelineationEntry["family"], number> = {
   phase: 1,
   ruler: 2,
   significator: 3,
-  dignity: 4,
-  aspect: 5,
-  pattern: 6,
-  house: 7,
-  lot: 8,
-  star: 9,
-  shape: 10,
-  sun: 11,
-  element: 12,
-  modality: 13,
-  sect: 14,
+  occupant: 4,
+  dignity: 5,
+  aspect: 6,
+  pair: 7,
+  pattern: 8,
+  condition: 9,
+  house: 10,
+  lot: 11,
+  star: 12,
+  shape: 13,
+  sun: 14,
+  element: 15,
+  modality: 16,
+  sect: 17,
 };
 
 /**
@@ -269,7 +291,7 @@ export async function selectDelineations(
   analysis: ChartAnalysis,
   opts: { limit?: number } = {}
 ): Promise<DelineationEntry[]> {
-  const limit = opts.limit ?? 26;
+  const limit = opts.limit ?? 32;
   const docs = await getDelineations();
   const all = delineationEntries(docs);
   if (!all.length) return [];
@@ -300,9 +322,12 @@ export function delineationBrief(entries: DelineationEntry[]): string {
     phase: "The Lunar Phase",
     ruler: "The Ruling Hand",
     significator: "The Mortal Significators & Karmic Axis",
+    occupant: "Significators in the Death Houses",
     dignity: "Planetary Condition (Dignity)",
     aspect: "Aspect Contacts",
+    pair: "Luminary–Malefic Contacts",
     pattern: "Aspect Patterns",
+    condition: "Chart Conditions",
     house: "The Death-House Complex (8th · 4th · 12th)",
     lot: "The Lots",
     star: "Fixed-Star Contacts",
