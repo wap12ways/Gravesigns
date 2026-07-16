@@ -26,6 +26,7 @@ import type { ChartAnalysis } from "../analysis";
 import { getSupabase } from "../supabase";
 import { NCGR_CODE_OF_ETHICS } from "./documents/ncgr-code-of-ethics";
 import { DEATH_DELINEATIONS_DOC } from "./documents/death-delineations";
+import { NATAL_DELINEATIONS_DOC } from "./documents/natal-delineations";
 import { CLASSICAL_SOURCES_DOC } from "./documents/classical-sources";
 import { CLASSICAL_PASSAGES_DOC } from "./documents/classical-passages";
 
@@ -33,6 +34,7 @@ import { CLASSICAL_PASSAGES_DOC } from "./documents/classical-passages";
 export const BUNDLED_DOCUMENTS: KnowledgeDocument[] = [
   NCGR_CODE_OF_ETHICS,
   DEATH_DELINEATIONS_DOC,
+  NATAL_DELINEATIONS_DOC,
   CLASSICAL_SOURCES_DOC,
   CLASSICAL_PASSAGES_DOC,
 ];
@@ -321,6 +323,47 @@ export async function selectDelineations(
   return matched.slice(0, limit);
 }
 
+// ── Natal delineation corpus: retrieval ─────────────────────────────────────
+// The natal-framed layer (Sun/Moon/Ascendant by sign, "who this soul was"). Same
+// factor-key scheme as the death corpus, so it reuses activeFactorKeys — but
+// pointed at the NATIVITY, and matched against the natal corpus only. Folded into
+// the Tier-2 sections when birth details are supplied.
+
+/** Load the active natal delineation documents (Supabase override, bundled). */
+export function getNatalDelineations(): Promise<KnowledgeDocument[]> {
+  return loadKnowledge("natal_delineation");
+}
+
+/**
+ * Select the natal delineations for the factors present in the NATIVITY. Reuses
+ * the same key derivation and family ranking as the death retrieval, pointed at
+ * the natal chart and matched against the natal corpus only. Capped tight
+ * because the natal layer supports only the Tier-2 identity sections. Never
+ * throws.
+ */
+export async function selectNatalDelineations(
+  natalChart: DeathChart,
+  natalAnalysis: ChartAnalysis,
+  opts: { limit?: number } = {}
+): Promise<DelineationEntry[]> {
+  const limit = opts.limit ?? 8;
+  const docs = await getNatalDelineations();
+  const all = delineationEntries(docs);
+  if (!all.length) return [];
+
+  const active = activeFactorKeys(natalChart, natalAnalysis);
+  const seen = new Set<string>();
+  const matched = all.filter((e) => {
+    if (!active.has(e.key) || seen.has(e.key)) return false;
+    seen.add(e.key);
+    return true;
+  });
+  matched.sort(
+    (a, b) => (FAMILY_RANK[a.family] ?? 99) - (FAMILY_RANK[b.family] ?? 99)
+  );
+  return matched.slice(0, limit);
+}
+
 /**
  * Render selected delineations into the Markdown reference block folded into the
  * composition pass. Grouped by family with light headers; every body is doctrine
@@ -370,6 +413,21 @@ export function delineationBrief(entries: DelineationEntry[]): string {
     }
   }
   return blocks.join("\n");
+}
+
+/**
+ * Render the natal delineations as a flat, natal-framed block (the entry titles
+ * already name the factor, so no death-framed family headings). For the Tier-2
+ * "The Life That Was" material.
+ */
+export function natalBrief(entries: DelineationEntry[]): string {
+  if (!entries.length) return "";
+  return entries
+    .map((e) => {
+      const src = e.source ? ` _(tradition: ${e.source})_` : "";
+      return `- **${e.title}** — ${e.body}${src}`;
+    })
+    .join("\n");
 }
 
 // ── Classical passages: retrieval ───────────────────────────────────────────

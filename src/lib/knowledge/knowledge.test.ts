@@ -21,7 +21,13 @@ import {
   classicalPassages,
   getClassicalSources,
 } from "./index";
+import {
+  selectNatalDelineations,
+  natalBrief,
+  getNatalDelineations,
+} from "./index";
 import { DEATH_DELINEATIONS } from "./documents/death-delineations";
+import { NATAL_DELINEATIONS } from "./documents/natal-delineations";
 import { CLASSICAL_PASSAGES } from "./documents/classical-passages";
 
 // The families the retrieval can emit and the corpus is expected to cover.
@@ -269,6 +275,47 @@ describe("bundled corpus wiring", () => {
   it("loads delineation entries through the knowledge seam (bundled fallback)", async () => {
     const entries = delineationEntries(await getDelineations());
     expect(entries.length).toBe(DEATH_DELINEATIONS.length);
+  });
+});
+
+describe("natal delineation corpus (the life that was)", () => {
+  it("is natal-framed and well-formed", () => {
+    expect(NATAL_DELINEATIONS.length).toBeGreaterThan(20);
+    const seen = new Set<string>();
+    for (const e of NATAL_DELINEATIONS) {
+      expect(e.key).toMatch(/^(sun|moon|asc):/);
+      expect(["sun", "moon", "asc"]).toContain(e.family);
+      expect(e.applies).toBe("natal");
+      expect(e.body.trim().length, e.key).toBeGreaterThan(40);
+      expect(seen.has(e.key), `duplicate natal key ${e.key}`).toBe(false);
+      seen.add(e.key);
+    }
+  });
+
+  it("selects natal-framed entries for the nativity's factors, capped and active-only", async () => {
+    // The nativity here is the synthetic chart (Moon Scorpio, Sun Taurus, Cancer rising).
+    const sel = await selectNatalDelineations(makeChart(), makeAnalysis());
+    expect(sel.length).toBeGreaterThan(0);
+    expect(sel.length).toBeLessThanOrEqual(8);
+    const active = activeFactorKeys(makeChart(), makeAnalysis());
+    for (const e of sel) {
+      expect(active.has(e.key)).toBe(true);
+      expect(e.applies).toBe("natal");
+    }
+    // The three identity factors of the fixture should all surface.
+    const keys = sel.map((e) => e.key);
+    expect(keys).toContain("moon:Scorpio");
+    expect(keys).toContain("sun:Taurus");
+    expect(keys).toContain("asc:Cancer");
+  });
+
+  it("loads through the knowledge seam and natalBrief renders titles", async () => {
+    const entries = delineationEntries(await getNatalDelineations());
+    expect(entries.length).toBe(NATAL_DELINEATIONS.length);
+    const sel = await selectNatalDelineations(makeChart(), makeAnalysis());
+    const brief = natalBrief(sel);
+    for (const e of sel) expect(brief).toContain(e.title);
+    expect(natalBrief([])).toBe("");
   });
 });
 

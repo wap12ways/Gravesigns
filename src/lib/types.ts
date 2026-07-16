@@ -144,6 +144,9 @@ export type KnowledgeKind =
   // draws on for depth (Moon-by-sign, the mortal significators, the death
   // houses, the Lots, the fixed stars). Entries ride in `metadata.entries`.
   | "delineation"
+  // The natal-framed interpretive corpus (Sun/Moon/Ascendant by sign, "who this
+  // soul was"), retrieved from the nativity for the Tier-2 sections.
+  | "natal_delineation"
   // A vetted bibliography of PUBLIC-DOMAIN classical sources — the legal-path
   // corpus the practice may ingest and store, with per-work rights status.
   | "classical_source"

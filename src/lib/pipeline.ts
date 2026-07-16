@@ -47,6 +47,8 @@ import {
   codeLabel,
   selectDelineations,
   delineationBrief,
+  selectNatalDelineations,
+  natalBrief,
   selectClassicalPassages,
   classicalBrief,
 } from "./knowledge";
@@ -806,14 +808,21 @@ export async function runReadingPipeline(args: PipelineArgs): Promise<PipelineRe
 
   // When a nativity was supplied, append the natal context: the birth chart's
   // own testimony, the length-of-life doctrine (descriptive), and the
-  // death-moment cross-aspects.
+  // death-moment cross-aspects. Also retrieve the natal-framed delineations for
+  // the nativity's identity factors — the material for the Tier-2 sections.
   const hasNatal = !!args.natalChart && !!args.birthDate;
+  let natalReference = "";
   if (hasNatal) {
     const natal = args.natalChart!;
     const natalAnalysis = computeChartAnalysis(natal);
     const lifespan = computeLifespan(natal, args.birthDate!, args.dateOfDeath);
     const cross = computeCrossAspects(natal, args.chart);
     brief += "\n\n" + natalContextToText(natal, natalAnalysis, lifespan, cross);
+    try {
+      natalReference = natalBrief(await selectNatalDelineations(natal, natalAnalysis));
+    } catch (err) {
+      console.error("[pipeline] natal delineation retrieval failed, composing without it:", err);
+    }
   }
 
   // Load the Code(s) of Ethics the reading aligns against. Loaded as data (with
@@ -835,6 +844,14 @@ export async function runReadingPipeline(args: PipelineArgs): Promise<PipelineRe
     reference = delineationBrief(delineations);
   } catch (err) {
     console.error("[pipeline] delineation retrieval failed, composing without it:", err);
+  }
+  // Fold the natal-framed delineations into the same reference, clearly labeled,
+  // so they reach every pass that reads `reference` (composition + rewrites) as
+  // the material for the Tier-2 "The Life That Was" section.
+  if (natalReference.trim()) {
+    reference +=
+      (reference.trim() ? "\n\n" : "") +
+      `### The Life That Was — natal delineations (who this soul was, for the Tier-2 sections)\n${natalReference}`;
   }
   try {
     const passages = await selectClassicalPassages(args.chart, analysis);
