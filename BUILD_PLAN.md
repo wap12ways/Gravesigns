@@ -342,11 +342,12 @@ interpretive *doctrine*, so the prose read thin (~800–1200 words, 8 sections,
 licensing).
 
 - **Interpretive corpus** (`src/lib/knowledge/documents/death-delineations.ts`)
-  — ~115 factor-keyed delineations across families: Moon & Sun by sign, lunar
+  — ~139 factor-keyed delineations across families: Moon & Sun by sign, lunar
   phase, sect, element, modality, chart shape, the mortal significators, the
-  karmic axis, the ruling hand, planetary condition (dignity), aspect contacts
-  (hard malefic / soft benefic), aspect patterns, the significators tenanting the
-  death houses (8th/4th/12th occupants — the most direct testimony), the specific
+  karmic axis, the ruling hand, the rising sign (Ascendant by sign), planetary
+  condition (dignity), aspect contacts (hard malefic / soft benefic), aspect
+  patterns, the significators tenanting the death houses (8th/4th/12th occupants
+  — the most direct testimony), the lord of the 8th by house, the specific
   luminary–malefic contacts (Moon–Saturn, Sun–Pluto, …), chart conditions
   (retrograde significator, anaretic/cusp degree), the 8th/4th/12th complex, the
   Lots, and the death-salient fixed stars. Written originally, grounded in the

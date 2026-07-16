@@ -27,25 +27,25 @@ import { CLASSICAL_PASSAGES } from "./documents/classical-passages";
 // The families the retrieval can emit and the corpus is expected to cover.
 const COVERED_FAMILIES: DelineationEntry["family"][] = [
   "moon", "sun", "phase", "sect", "element", "modality", "shape",
-  "significator", "ruler", "occupant", "dignity", "aspect", "pair", "pattern",
-  "condition", "house", "lot", "star",
+  "significator", "ruler", "asc", "occupant", "lord8", "dignity", "aspect",
+  "pair", "pattern", "condition", "house", "lot", "star",
 ];
 
 // Every entry's key prefix must map to its declared family.
 const PREFIX_FAMILY: Record<string, DelineationEntry["family"]> = {
   moon: "moon", sun: "sun", phase: "phase", sect: "sect", element: "element",
   modality: "modality", shape: "shape", significator: "significator",
-  ruler: "ruler", occupant: "occupant", dignity: "dignity", aspect: "aspect",
-  pair: "pair", pattern: "pattern", condition: "condition",
-  house: "house", lot: "lot", star: "star",
+  ruler: "ruler", asc: "asc", occupant: "occupant", lord8: "lord8",
+  dignity: "dignity", aspect: "aspect", pair: "pair", pattern: "pattern",
+  condition: "condition", house: "house", lot: "lot", star: "star",
 };
 
 // Spine-first priority the selection ranks by. The sequence of families in any
 // result must be a subsequence of this order.
 const FAMILY_PRIORITY: DelineationEntry["family"][] = [
-  "moon", "phase", "ruler", "significator", "occupant", "dignity", "aspect",
-  "pair", "pattern", "condition", "house", "lot", "star", "shape", "sun",
-  "element", "modality", "sect",
+  "moon", "phase", "ruler", "asc", "significator", "occupant", "lord8",
+  "dignity", "aspect", "pair", "pattern", "condition", "house", "lot", "star",
+  "shape", "sun", "element", "modality", "sect",
 ];
 
 /** A richly-populated synthetic chart that lights up most factor families. */
@@ -109,7 +109,7 @@ function makeAnalysis(over: Partial<ChartAnalysis> = {}): ChartAnalysis {
     ],
     death: {
       houses: [
-        { house: 8, role: "death", occupants: ["Saturn", "Pluto"] },
+        { house: 8, role: "death", occupants: ["Saturn", "Pluto"], rulerPlacement: { sign: "Aries", house: 10, retrograde: false } },
         { house: 4, role: "grave", occupants: [] },
         { house: 12, role: "undoing", occupants: ["Mean Node"] },
       ],
@@ -134,7 +134,7 @@ describe("delineation corpus integrity", () => {
   it("is non-empty and every entry is well-formed", () => {
     expect(DEATH_DELINEATIONS.length).toBeGreaterThan(50);
     for (const e of DEATH_DELINEATIONS) {
-      expect(e.key, `key on ${JSON.stringify(e.title)}`).toMatch(/^[a-z]+:.+/);
+      expect(e.key, `key on ${JSON.stringify(e.title)}`).toMatch(/^[a-z0-9]+:.+/);
       expect(e.title.trim().length, e.key).toBeGreaterThan(0);
       expect(e.body.trim().length, e.key).toBeGreaterThan(40);
       expect(COVERED_FAMILIES, e.key).toContain(e.family);
@@ -177,6 +177,7 @@ describe("activeFactorKeys", () => {
     for (const k of [
       "moon:Scorpio", "sun:Taurus", "phase:Full Moon", "sect:night",
       "element:Water", "modality:Fixed", "shape:Bowl", "ruler:Moon",
+      "asc:Cancer", "lord8:10",
       "significator:Saturn", "significator:Moon", "significator:Nodes",
       "dignity:fall", "dignity:domicile",
       "aspect:Saturn-hard", "aspect:Mars-hard", "aspect:Jupiter-soft", "aspect:Venus-soft",
@@ -275,7 +276,7 @@ describe("classical passages (public-domain primary sources)", () => {
   it("every passage is well-formed and carries a work + citation", () => {
     expect(CLASSICAL_PASSAGES.length).toBeGreaterThan(0);
     for (const p of CLASSICAL_PASSAGES) {
-      expect(p.key).toMatch(/^[a-z]+:.+/);
+      expect(p.key).toMatch(/^[a-z0-9]+:.+/);
       expect(p.text.trim().length, p.key).toBeGreaterThan(30);
       expect(p.work.trim().length, p.key).toBeGreaterThan(0);
       expect(p.ref.trim().length, p.key).toBeGreaterThan(0);

@@ -184,6 +184,15 @@ export function activeFactorKeys(chart: DeathChart, analysis: ChartAnalysis): Se
     keys.add(`ruler:${analysis.ascendantAlmuten.planet}`);
   }
 
+  // The rising sign — the horizon at the crossing (present only with angles).
+  if (chart.ascendant?.sign) keys.add(`asc:${chart.ascendant.sign}`);
+
+  // The lord of the 8th by house — where the ruler of death's house is carried.
+  const eighth = analysis.death.houses.find((h) => h.house === 8);
+  if (eighth?.rulerPlacement?.house != null) {
+    keys.add(`lord8:${eighth.rulerPlacement.house}`);
+  }
+
   // Aspect patterns detected across the bodies (stellium, T-square, …).
   for (const pat of analysis.patterns) keys.add(`pattern:${pat.type}`);
 
@@ -263,21 +272,23 @@ const FAMILY_RANK: Record<DelineationEntry["family"], number> = {
   moon: 0,
   phase: 1,
   ruler: 2,
-  significator: 3,
-  occupant: 4,
-  dignity: 5,
-  aspect: 6,
-  pair: 7,
-  pattern: 8,
-  condition: 9,
-  house: 10,
-  lot: 11,
-  star: 12,
-  shape: 13,
-  sun: 14,
-  element: 15,
-  modality: 16,
-  sect: 17,
+  asc: 3,
+  significator: 4,
+  occupant: 5,
+  lord8: 6,
+  dignity: 7,
+  aspect: 8,
+  pair: 9,
+  pattern: 10,
+  condition: 11,
+  house: 12,
+  lot: 13,
+  star: 14,
+  shape: 15,
+  sun: 16,
+  element: 17,
+  modality: 18,
+  sect: 19,
 };
 
 /**
@@ -291,7 +302,7 @@ export async function selectDelineations(
   analysis: ChartAnalysis,
   opts: { limit?: number } = {}
 ): Promise<DelineationEntry[]> {
-  const limit = opts.limit ?? 32;
+  const limit = opts.limit ?? 36;
   const docs = await getDelineations();
   const all = delineationEntries(docs);
   if (!all.length) return [];
@@ -321,8 +332,10 @@ export function delineationBrief(entries: DelineationEntry[]): string {
     moon: "The Soul's Vehicle — the Moon",
     phase: "The Lunar Phase",
     ruler: "The Ruling Hand",
+    asc: "The Rising Sign (the Horizon at the Crossing)",
     significator: "The Mortal Significators & Karmic Axis",
     occupant: "Significators in the Death Houses",
+    lord8: "The Lord of the 8th, by House",
     dignity: "Planetary Condition (Dignity)",
     aspect: "Aspect Contacts",
     pair: "Luminary–Malefic Contacts",
