@@ -59,26 +59,36 @@ import {
 } from "./knowledge";
 
 /**
- * Per-pass model selection. Every pass defaults to Opus 4.8 (the "showcase"
- * profile) and is independently overridable by environment variable, so the
- * pipeline can be tiered later (e.g. Sonnet for judgment, Haiku for the audits)
- * without any code change. `ANTHROPIC_MODEL` sets the fallback default for all
- * passes at once.
+ * Per-pass model selection, tiered for latency by default.
  *
- * Rewrites are deliberately NOT their own knob: both the ethics and the
- * verification rewrite regenerate the family-facing reading, so they always run
- * on the composition model. That keeps the finished prose at composition grade
- * no matter how cheap the audits are tiered down to.
+ * The reading now runs SIX sequential Claude passes; with every one on Opus the
+ * request can exceed a serverless function's time limit. So the family-facing
+ * READING stays Opus-grade — composition and both rewrites (which regenerate the
+ * reading) run on `DEFAULT_MODEL`, Opus 4.8 — while the five ancillary passes
+ * (judgment, synthesis, ethics audit, verification, study notes) default to a
+ * faster model, `AUX_MODEL` (Sonnet 5). This keeps the prose at composition
+ * grade while roughly halving the critical-path time.
+ *
+ * Every knob is overridable:
+ *   - ANTHROPIC_MODEL          → forces ALL passes to one model (e.g. set it to
+ *                                claude-opus-4-8 to restore the all-Opus profile).
+ *   - ANTHROPIC_MODEL_AUX      → the default for the ancillary passes.
+ *   - ANTHROPIC_MODEL_<PASS>   → overrides a single pass.
+ * Rewrites are deliberately NOT their own knob: they always run on the
+ * composition model, so the finished prose stays at composition grade no matter
+ * how cheaply the audits are tiered.
  */
 const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-4-8";
+const AUX_MODEL =
+  process.env.ANTHROPIC_MODEL || process.env.ANTHROPIC_MODEL_AUX || "claude-sonnet-5";
 
 export const MODELS = {
-  judgment: process.env.ANTHROPIC_MODEL_JUDGMENT || DEFAULT_MODEL,
-  themes: process.env.ANTHROPIC_MODEL_THEMES || DEFAULT_MODEL,
+  judgment: process.env.ANTHROPIC_MODEL_JUDGMENT || AUX_MODEL,
+  themes: process.env.ANTHROPIC_MODEL_THEMES || AUX_MODEL,
   composition: process.env.ANTHROPIC_MODEL_COMPOSITION || DEFAULT_MODEL,
-  ethics: process.env.ANTHROPIC_MODEL_ETHICS || DEFAULT_MODEL,
-  verification: process.env.ANTHROPIC_MODEL_VERIFICATION || DEFAULT_MODEL,
-  studyNotes: process.env.ANTHROPIC_MODEL_STUDY_NOTES || DEFAULT_MODEL,
+  ethics: process.env.ANTHROPIC_MODEL_ETHICS || AUX_MODEL,
+  verification: process.env.ANTHROPIC_MODEL_VERIFICATION || AUX_MODEL,
+  studyNotes: process.env.ANTHROPIC_MODEL_STUDY_NOTES || AUX_MODEL,
 } as const;
 
 /**
@@ -92,9 +102,11 @@ export const READING_MODEL = MODELS.composition;
  * Token ceiling for every pass that emits the full family-facing reading —
  * the composition itself and the two rewrites (ethics, verification). Sized for
  * the deepened section architecture (~1800–2600 words, ~10 sections, up to 13
- * with a nativity) with headroom, so a rich reading is never truncated.
+ * with a nativity): 6144 tokens is ~4,600 words of headroom over a 2,600-word
+ * target, so a rich reading is never truncated, without paying for output tokens
+ * (and the wall-clock time) the reading never uses.
  */
-const COMPOSITION_MAX_TOKENS = 8192;
+const COMPOSITION_MAX_TOKENS = 6144;
 
 export interface PipelineArgs {
   fullName: string;

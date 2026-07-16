@@ -279,9 +279,14 @@ proven correct without a live model run.
 4. Deploy.
 
 The reading route requests a 300s `maxDuration` (honoured up to your Vercel
-plan's ceiling — 300s on Pro, capped to 60s on Hobby) because it runs three
-sequential Claude passes. It runs on the **Node.js runtime** (required by the
-ephemeris and the Anthropic SDK) and streams each pass to avoid HTTP timeouts.
+plan's ceiling — 300s on Pro, capped to 60s on Hobby) because it runs **six
+sequential Claude passes**. To fit inside that window the passes are
+**model-tiered by default** — Opus 4.8 for the family-facing reading, Sonnet 5
+for the five ancillary passes (see the Models section of `.env.example`). It runs
+on the **Node.js runtime** (required by the ephemeris and the Anthropic SDK). The
+route awaits the full pipeline and returns the finished bundle as JSON; on the
+60s Hobby limit the all-Opus profile will time out, so keep the tiered default
+(or upgrade the plan) there.
 
 ## ✦ Customizing the reading voice
 
