@@ -330,3 +330,44 @@ irrelevant (astrology is geocentric); never present as evidence.
 - **Astronomy:** Meeus *Astronomical Algorithms* (sidereal time, obliquity, alt/az, phase);
   Swiss Ephemeris `swe_fixstar2` + `sefstars.txt`; Yale BSC5; Stellarium; Robson/Ebertin/Brady
   fixed-star corpus.
+
+---
+
+## Addendum — the reading-depth engine (post-launch sprint)
+
+The launched pipeline computed rich chart *data* but gave the composer little
+interpretive *doctrine*, so the prose read thin (~800–1200 words, 8 sections,
+1–2 paragraphs each). This sprint added the missing meaning layer, on the
+**legal path only** (original writing + public-domain sources; no commercial
+licensing).
+
+- **Interpretive corpus** (`src/lib/knowledge/documents/death-delineations.ts`)
+  — ~91 factor-keyed delineations across families: Moon & Sun by sign, lunar
+  phase, sect, element, modality, chart shape, the mortal significators, the
+  karmic axis, planetary condition (dignity), aspect contacts (hard malefic /
+  soft benefic), aspect patterns, the ruling hand, the 8th/4th/12th complex, the
+  Lots, and the death-salient fixed stars. Written originally, grounded in the
+  public-domain tradition (Ptolemy, Valens, Dorotheus, Firmicus, Lilly).
+- **Targeted retrieval** (`src/lib/knowledge/index.ts`) —
+  `selectDelineations(chart, analysis)` derives the factor keys actually present
+  from the same deterministic analysis the visuals use, matches the corpus,
+  ranks spine-first, caps, and folds only those entries into composition. Not a
+  dump.
+- **Public-domain primary text** (`classical-passages.ts`) — verbatim Ptolemy
+  (Ashmand 1822) temperament passages, retrieved by the same keys, folded in as
+  a secondary reference. Cause-/manner-of-death chapters excluded by policy.
+- **Wider section architecture** (`src/lib/pipeline.ts`) — added *The Shape of
+  the Whole*, *The Ruling Hand*, and *The Karmic Axis*; 2–4 paragraphs per
+  section; ~1400–2000 words with a matching token ceiling across composition and
+  both rewrites.
+- **Sourcing policy** (`classical-sources.ts`) — a vetted bibliography splitting
+  ingestible public-domain works from doctrine-only works whose modern
+  translations remain under copyright.
+- **Tests** (`knowledge.test.ts`) — vitest coverage of corpus integrity and the
+  full retrieval seam, so the depth work is provable without a live model run.
+
+**Next (still legal-path):** more delineation families (benefic *patterns*,
+Ascendant/chart-ruler-by-sign); bulk ingest of Section-A public-domain text with
+embedding-based retrieval for the classical layer; and encoding the pre-session
+preparation labor (`docs/research/pre-session-preparation-labor.md`) as explicit
+pipeline prep passes.

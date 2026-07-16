@@ -50,10 +50,12 @@ alter table public.readings add column if not exists study_notes jsonb;
 -- published readings, case data) as new ROWS, with no schema change.
 -- Kind-specific extras live in `metadata`, so new kinds never force a migration.
 --
--- Both kinds ship BUNDLED in the app and fall back gracefully, so seeding here
--- is optional — it just makes the corpus editable in the DB without a redeploy.
--- A `delineation` row mirrors the bundled shape: kind = 'delineation', with
--- metadata = '{"entries": [{"key":"moon:Scorpio","family":"moon", …}, …]}'.
+-- All bundled kinds fall back gracefully, so seeding here is optional — it just
+-- makes the corpus editable in the DB without a redeploy. Row shapes mirror the
+-- bundled documents:
+--   • kind = 'delineation'      → metadata '{"entries":  [{"key":"moon:Scorpio","family":"moon", …}]}'
+--   • kind = 'classical_source' → metadata '{"passages": [{"key":"significator:Saturn","work":"…","ref":"…","text":"…"}]}'
+--                                  (verbatim public-domain excerpts) OR a bibliography row with no passages.
 -- ─────────────────────────────────────────────────────────────
 
 create table if not exists public.knowledge_documents (

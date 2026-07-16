@@ -101,10 +101,12 @@ src/
     │   └── index.ts               # computeChartAnalysis()
     ├── knowledge/                 # the reference corpus (ethics + delineations)
     │   ├── index.ts               # loadKnowledge() + selectDelineations() — Supabase w/ bundled fallback
+    │   ├── knowledge.test.ts        # vitest suite over the retrieval/corpus engine
     │   └── documents/
     │       ├── ncgr-code-of-ethics.ts   # bundled, verbatim NCGR code
     │       ├── death-delineations.ts    # factor-keyed interpretive corpus (Moon-by-sign, significators, …)
-    │       └── classical-sources.ts     # legal-path bibliography (public-domain vs. doctrine-only)
+    │       ├── classical-sources.ts     # legal-path bibliography (public-domain vs. doctrine-only)
+    │       └── classical-passages.ts    # verbatim public-domain excerpts (Ptolemy, Ashmand 1822)
     ├── glyphs.ts                  # shared glyphs + element palette
     ├── supabase.ts                # persistence (graceful demo fallback)
     ├── markdown.ts                # tiny, safe MD → HTML
@@ -224,6 +226,38 @@ ancient texts whose sole modern English translations remain under copyright
 copied. It carries a per-work rights note and an ingestion policy for the future
 full-text corpus. (Rights hygiene, not legal advice — confirm any edition before
 storing it.)
+
+The first such ingest is already in the app: **`classical-passages.ts`** holds
+**verbatim public-domain excerpts** from Ptolemy's _Tetrabiblos_ (Ashmand's 1822
+translation), retrieved by the same factor keys as the delineations and folded
+into composition as a secondary **PRIMARY SOURCES** reference — the tradition in
+its own words alongside the practice's original delineations. Only
+**temperament / nature** passages are ingested (Book I — the benefic/maleficent
+bodies, the sect); the _Tetrabiblos_' duration- and kind-of-death chapters are
+**deliberately excluded**, because GraveSigns never reads for a cause or a manner
+of death and the composer must never be handed material that pushes toward one.
+A test asserts no ingested passage contains cause-/manner-of-death content, and
+the composer is instructed to echo the passages only sparingly and never import a
+claim of cause or manner from them.
+
+### Tests
+
+The deterministic reading-depth engine — corpus integrity and the whole
+retrieval seam — is covered by a **vitest** suite
+([`src/lib/knowledge/knowledge.test.ts`](src/lib/knowledge/knowledge.test.ts)):
+
+```bash
+npm test          # run once
+npm run test:watch
+```
+
+It verifies well-formed, unique, correctly-familied corpus entries; that every
+retrieval-emittable family is covered; that `activeFactorKeys` derives the right
+keys (and none when a chart lacks that testimony); that selection is
+active-only, de-duplicated, spine-first ranked, and capped; that the classical
+passages are well-formed and carry no cause-/manner-of-death content; and that
+everything loads through the bundled fallback. This is how the depth work is
+proven correct without a live model run.
 
 ## ✦ Deploy to Vercel
 
