@@ -22,8 +22,9 @@ transition.
 - **Next.js 15** (App Router) + **TypeScript**
 - **Tailwind CSS** + **shadcn/ui**-style components
 - **Supabase** (Postgres) for storing readings
-- **Anthropic Claude** for reading generation — five passes, each on a model you
-  choose (defaults to `claude-opus-4-8` everywhere; per-pass overridable)
+- **Anthropic Claude** for reading generation — six passes, model-tiered by
+  default (Opus 4.8 for the reading, Sonnet 5 for the ancillary passes) and
+  per-pass overridable
 - **Swiss Ephemeris** via **sweph-wasm** — the astrologer's gold-standard ephemeris (full DE431 `.se1` data files), compiled to WebAssembly, no native deps
 - Proper **time-zone resolution** (`tz-lookup` + `luxon`) with DST/historical rules
 - Premium form UX: a **searchable time-zone combobox** with live GMT-offset badges and a **place autocomplete** that pins exact coordinates
@@ -45,8 +46,14 @@ POST /api/readings
                 aspect patterns, chart shape, fixed stars, the 8th/4th/12th
                 complex, mortal significators; + lifespan & cross-aspects if natal
         Pass A  Judgment      — Claude distils a weighted, sourced dossier (JSON)
+        Pass S  Synthesis     — Claude turns the dossier into an explicit reading
+                                plan (3–5 core themes + narrative arc), the way a
+                                practitioner preps before a session
         Pass B  Composition   — Claude composes the reading (born aligned to a
-                                short ethical covenant loaded from the corpus)
+                                short ethical covenant, built on the reading plan,
+                                and deepened by the interpretive delineations and
+                                public-domain passages retrieved for this chart;
+                                natal readings also pull natal-framed delineations)
         Pass E  Ethical Alignment — Claude audits the prose against the loaded
                                 Code(s) of Ethics; one revision if misaligned
         Pass C  Verification  — Claude audits it; one revision if it fails
@@ -97,10 +104,14 @@ src/
     │   ├── lifespan.ts / synastry.ts   # natal (Tier-2) doctrine
     │   ├── serialize.ts           # analysis → evidence brief
     │   └── index.ts               # computeChartAnalysis()
-    ├── knowledge/                 # the reference corpus (ethics + future kinds)
-    │   ├── index.ts               # loadKnowledge() — Supabase w/ bundled fallback
+    ├── knowledge/                 # the reference corpus (ethics + delineations)
+    │   ├── index.ts               # loadKnowledge() + selectDelineations() — Supabase w/ bundled fallback
+    │   ├── knowledge.test.ts        # vitest suite over the retrieval/corpus engine
     │   └── documents/
-    │       └── ncgr-code-of-ethics.ts   # bundled, verbatim NCGR code
+    │       ├── ncgr-code-of-ethics.ts   # bundled, verbatim NCGR code
+    │       ├── death-delineations.ts    # factor-keyed interpretive corpus (Moon-by-sign, significators, …)
+    │       ├── classical-sources.ts     # legal-path bibliography (public-domain vs. doctrine-only)
+    │       └── classical-passages.ts    # verbatim public-domain excerpts (Ptolemy, Ashmand 1822)
     ├── glyphs.ts                  # shared glyphs + element palette
     ├── supabase.ts                # persistence (graceful demo fallback)
     ├── markdown.ts                # tiny, safe MD → HTML
@@ -166,6 +177,99 @@ the full code and revises it once if it is materially misaligned. Its verdict
 `knowledge_documents` row (no deploy) or the bundled file — the text is loaded
 as data, never hardcoded into a prompt.
 
+### The delineation corpus & retrieval
+
+The corpus's second kind, **`delineation`**, is the practice's compiled
+*interpretive* reference — short, source-grounded readings of each chart factor
+(the Moon by sign, the lunar phase, the sect, the elemental cast, the chart
+shape, the mortal significators, the 8th/4th/12th complex, the Lots, and the
+death-salient fixed stars). It answers a different need than the astronomy: the
+deterministic engine tells the composer **what** is in the sky, and the
+delineation corpus tells it **what the tradition makes of it** — the doctrine a
+practitioner carries from years with the texts. Without it, each factor got a
+single thin sentence; with it, the composer has real depth to draw on.
+
+Retrieval is **targeted, not a dump.** Each entry carries a `key`
+(`moon:Scorpio`, `phase:Full Moon`, `significator:Saturn`, `house:8`,
+`lot:Lot of Death`, `star:Algol`, …). `selectDelineations(chart, analysis)`
+derives the keys **actually present** in a given chart from the same
+deterministic analysis the visuals use, matches them against the corpus, ranks
+so the interpretive spine (Moon, phase, significators, the death houses) leads,
+caps the set, and folds only those entries into the composition pass. So a
+water-sign, full-Moon, Saturn-weighted crossing pulls exactly the delineations
+that bear on it and nothing else.
+
+Every bundled entry is written **originally** for GraveSigns; where it cites a
+source it points to the **public-domain** tradition (Ptolemy, Valens, Dorotheus,
+Firmicus, Lilly) as a study trail — no copyrighted modern text is reproduced. It
+ships bundled (so it works in demo mode with no database) and, like the ethics
+code, can be **overridden or extended from Supabase** by adding
+`knowledge_documents` rows of kind `delineation` whose `metadata.entries` array
+holds more `{key, family, title, body, source}` entries — no code change. That
+is also the seam through which larger sources (public-domain classical texts,
+association standards) would be ingested and stored.
+
+The corpus covers, by family: the Moon and Sun by sign, the lunar phase, the
+sect, the elemental and modal cast, the chart shape, the mortal significators and
+the karmic axis, the **ruling hand** (chart ruler / almuten), the **rising sign**
+(the horizon at the crossing), **planetary condition (dignity)**, aspect
+**contacts** (hard malefic / soft benefic) and **patterns** (stellium, T-square,
+grand trine, yod), the **significators tenanting the death houses** (a body in
+the 8th/4th/12th — the most direct death testimony), the **lord of the 8th by
+house** (where the keeper of death's gate is carried), the specific
+**luminary–malefic contacts** (Moon–Saturn, Sun–Pluto, …), **chart conditions**
+(a retrograde significator, an anaretic or cusp degree), the 8th/4th/12th
+complex, the Lots, and the death-salient fixed stars — **~139 entries**. The retrieval derives the condition-sensitive keys (dignity, contacts,
+occupancy) only for the luminaries and mortal significators, so those layers stay
+meaningful rather than noisy.
+
+### Legal-path sourcing policy
+
+The corpus is grown on the **legal path only**: original writing plus
+**public-domain** primary sources — no commercially licensed modern text is
+stored. A third corpus kind, **`classical_source`**
+([`classical-sources.ts`](src/lib/knowledge/documents/classical-sources.ts)), is
+a vetted bibliography that records exactly which works may be ingested verbatim
+(e.g. Ptolemy's _Tetrabiblos_ in Ashmand's 1822 translation, Lilly's 1647
+_Christian Astrology_, Alan Leo, Sepharial) versus which are **doctrine-only** —
+ancient texts whose sole modern English translations remain under copyright
+(Valens, Dorotheus, Firmicus, Bonatti), to be cited as study references but never
+copied. It carries a per-work rights note and an ingestion policy for the future
+full-text corpus. (Rights hygiene, not legal advice — confirm any edition before
+storing it.)
+
+The first such ingest is already in the app: **`classical-passages.ts`** holds
+**verbatim public-domain excerpts** from Ptolemy's _Tetrabiblos_ (Ashmand's 1822
+translation), retrieved by the same factor keys as the delineations and folded
+into composition as a secondary **PRIMARY SOURCES** reference — the tradition in
+its own words alongside the practice's original delineations. Only
+**temperament / nature** passages are ingested (Book I — the benefic/maleficent
+bodies, the sect); the _Tetrabiblos_' duration- and kind-of-death chapters are
+**deliberately excluded**, because GraveSigns never reads for a cause or a manner
+of death and the composer must never be handed material that pushes toward one.
+A test asserts no ingested passage contains cause-/manner-of-death content, and
+the composer is instructed to echo the passages only sparingly and never import a
+claim of cause or manner from them.
+
+### Tests
+
+The deterministic reading-depth engine — corpus integrity and the whole
+retrieval seam — is covered by a **vitest** suite
+([`src/lib/knowledge/knowledge.test.ts`](src/lib/knowledge/knowledge.test.ts)):
+
+```bash
+npm test          # run once
+npm run test:watch
+```
+
+It verifies well-formed, unique, correctly-familied corpus entries; that every
+retrieval-emittable family is covered; that `activeFactorKeys` derives the right
+keys (and none when a chart lacks that testimony); that selection is
+active-only, de-duplicated, spine-first ranked, and capped; that the classical
+passages are well-formed and carry no cause-/manner-of-death content; and that
+everything loads through the bundled fallback. This is how the depth work is
+proven correct without a live model run.
+
 ## ✦ Deploy to Vercel
 
 1. Push this repo to GitHub.
@@ -176,32 +280,43 @@ as data, never hardcoded into a prompt.
 4. Deploy.
 
 The reading route requests a 300s `maxDuration` (honoured up to your Vercel
-plan's ceiling — 300s on Pro, capped to 60s on Hobby) because it runs three
-sequential Claude passes. It runs on the **Node.js runtime** (required by the
-ephemeris and the Anthropic SDK) and streams each pass to avoid HTTP timeouts.
+plan's ceiling — 300s on Pro, capped to 60s on Hobby) because it runs **six
+sequential Claude passes**. To fit inside that window the passes are
+**model-tiered by default** — Opus 4.8 for the family-facing reading, Sonnet 5
+for the five ancillary passes (see the Models section of `.env.example`). It runs
+on the **Node.js runtime** (required by the ephemeris and the Anthropic SDK). The
+route awaits the full pipeline and returns the finished bundle as JSON; on the
+60s Hobby limit the all-Opus profile will time out, so keep the tiered default
+(or upgrade the plan) there.
 
 ## ✦ Customizing the reading voice
 
 The astrologer personas live in [`src/lib/pipeline.ts`](src/lib/pipeline.ts):
-`JUDGMENT_SYSTEM` (what evidence to weigh), `COMPOSITION_SYSTEM` (voice,
-integrity, and the section shape of every reading), `ETHICS_SYSTEM` (the
-ethical-alignment audit), `VERIFY_SYSTEM` (the integrity audit), and
-`STUDY_NOTES_SYSTEM` (the practitioner's notebook). Edit them there to retune
-the craft. The deterministic astrology it all builds on lives in
-[`src/lib/analysis/`](src/lib/analysis).
+`JUDGMENT_SYSTEM` (what evidence to weigh), `THEMES_SYSTEM` (the reading plan —
+core themes + arc), `COMPOSITION_SYSTEM` (voice, integrity, and the section shape
+of every reading), `ETHICS_SYSTEM` (the ethical-alignment audit), `VERIFY_SYSTEM`
+(the integrity audit), and `STUDY_NOTES_SYSTEM` (the practitioner's notebook).
+Edit them there to retune the craft. The deterministic astrology it all builds on
+lives in [`src/lib/analysis/`](src/lib/analysis); the interpretive corpus the
+passes draw on lives in [`src/lib/knowledge/`](src/lib/knowledge).
 
 ### Choosing a model per pass
 
-Each of the five passes picks its model from `MODELS` in
+Each of the six passes picks its model from `MODELS` in
 [`src/lib/pipeline.ts`](src/lib/pipeline.ts), and every pass is independently
 overridable by environment variable — so the pipeline can be tiered for cost or
-latency without a code change. All passes default to **`claude-opus-4-8`**;
-`ANTHROPIC_MODEL` sets the default for all at once, and the per-pass vars
-(`ANTHROPIC_MODEL_JUDGMENT`, `…_COMPOSITION`, `…_ETHICS`, `…_VERIFICATION`,
-`…_STUDY_NOTES`) override individual passes. The ethics and verification
-**rewrites** always run on the composition model, so the finished reading stays
-at composition grade no matter how cheaply the audits are tiered. See
-[`.env.example`](.env.example) for a ready cost-tiered profile.
+latency without a code change. **By default the passes are tiered**: composition
+and both rewrites run on **`claude-opus-4-8`** (the family-facing reading), while
+the five ancillary passes (judgment, synthesis, ethics audit, verification, study
+notes) default to **`claude-sonnet-5`** so the six-pass request fits inside a
+serverless time limit. `ANTHROPIC_MODEL` forces one model for all passes (set it
+to `claude-opus-4-8` for the all-Opus profile — slower, may exceed a 60s Hobby
+limit); `ANTHROPIC_MODEL_AUX` retunes the ancillary tier; and the per-pass vars
+(`ANTHROPIC_MODEL_JUDGMENT`, `…_THEMES`, `…_COMPOSITION`, `…_ETHICS`,
+`…_VERIFICATION`, `…_STUDY_NOTES`) override individual passes. The ethics and
+verification **rewrites** always run on the composition model, so the finished
+reading stays at composition grade no matter how cheaply the audits are tiered.
+See [`.env.example`](.env.example) for the full profile.
 
 ## ✦ On the astronomy
 

@@ -15,12 +15,29 @@
  * That fallback is what lets the app run in demo mode, survive a schema lag, and
  * treat the DB as the editable source of truth without ever risking a reading.
  */
-import type { KnowledgeDocument, KnowledgeKind } from "../types";
+import type {
+  ClassicalPassage,
+  DelineationEntry,
+  DeathChart,
+  KnowledgeDocument,
+  KnowledgeKind,
+} from "../types";
+import type { ChartAnalysis } from "../analysis";
 import { getSupabase } from "../supabase";
 import { NCGR_CODE_OF_ETHICS } from "./documents/ncgr-code-of-ethics";
+import { DEATH_DELINEATIONS_DOC } from "./documents/death-delineations";
+import { NATAL_DELINEATIONS_DOC } from "./documents/natal-delineations";
+import { CLASSICAL_SOURCES_DOC } from "./documents/classical-sources";
+import { CLASSICAL_PASSAGES_DOC } from "./documents/classical-passages";
 
 /** Everything compiled into the app. New bundled documents are added here. */
-export const BUNDLED_DOCUMENTS: KnowledgeDocument[] = [NCGR_CODE_OF_ETHICS];
+export const BUNDLED_DOCUMENTS: KnowledgeDocument[] = [
+  NCGR_CODE_OF_ETHICS,
+  DEATH_DELINEATIONS_DOC,
+  NATAL_DELINEATIONS_DOC,
+  CLASSICAL_SOURCES_DOC,
+  CLASSICAL_PASSAGES_DOC,
+];
 
 function bundledByKind(kind: KnowledgeKind): KnowledgeDocument[] {
   return BUNDLED_DOCUMENTS.filter(
@@ -110,4 +127,375 @@ export function operatingSummary(docs: KnowledgeDocument[]): string {
 export function codeLabel(doc: KnowledgeDocument): string {
   const label = doc.metadata?.code_label;
   return typeof label === "string" && label.trim() ? label.trim() : doc.slug;
+}
+
+// ── Delineation corpus: retrieval ───────────────────────────────────────────
+// The interpretive layer. Delineation documents (kind `delineation`) carry a
+// factor-keyed array of entries in `metadata.entries`. We load them through the
+// same Supabase-with-bundled-fallback seam, then select ONLY the entries whose
+// key matches a factor actually present in the chart — so the composer gets
+// targeted depth, never the whole corpus.
+
+/** Load the active delineation documents (Supabase override, bundled fallback). */
+export function getDelineations(): Promise<KnowledgeDocument[]> {
+  return loadKnowledge("delineation");
+}
+
+/** Flatten the `metadata.entries` of a set of delineation documents. */
+export function delineationEntries(docs: KnowledgeDocument[]): DelineationEntry[] {
+  const out: DelineationEntry[] = [];
+  for (const d of docs) {
+    const entries = d.metadata?.entries;
+    if (Array.isArray(entries)) {
+      for (const e of entries) {
+        if (e && typeof e.key === "string" && typeof e.body === "string") {
+          out.push(e as DelineationEntry);
+        }
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * The set of factor keys actually present in a given chart + analysis. These are
+ * the tokens a delineation entry's `key` is matched against. Kept deterministic
+ * and dependency-light: it reads only the computed frame, never the ephemeris.
+ */
+export function activeFactorKeys(chart: DeathChart, analysis: ChartAnalysis): Set<string> {
+  const keys = new Set<string>();
+
+  const moon = chart.planets.find((p) => p.name === "Moon");
+  if (moon) keys.add(`moon:${moon.sign}`);
+  const sun = chart.planets.find((p) => p.name === "Sun");
+  if (sun) keys.add(`sun:${sun.sign}`);
+
+  if (chart.moonPhase) keys.add(`phase:${chart.moonPhase}`);
+  keys.add(`sect:${chart.sect}`);
+  if (chart.dominantElement) keys.add(`element:${chart.dominantElement}`);
+  if (chart.dominantModality) keys.add(`modality:${chart.dominantModality}`);
+  if (analysis.shape?.shape) keys.add(`shape:${analysis.shape.shape}`);
+
+  for (const m of analysis.death.mortalSignificators) keys.add(`significator:${m.name}`);
+  // The lunar nodes ride the chart's planet list under various labels.
+  if (chart.planets.some((p) => /node/i.test(p.name))) keys.add("significator:Nodes");
+
+  // The Ruling Hand: the governor of the chart — the almuten of the Ascendant
+  // degree (present only when angles are known). One classical planet.
+  if (analysis.ascendantAlmuten?.planet) {
+    keys.add(`ruler:${analysis.ascendantAlmuten.planet}`);
+  }
+
+  // The rising sign — the horizon at the crossing (present only with angles).
+  if (chart.ascendant?.sign) keys.add(`asc:${chart.ascendant.sign}`);
+
+  // The lord of the 8th by house — where the ruler of death's house is carried.
+  const eighth = analysis.death.houses.find((h) => h.house === 8);
+  if (eighth?.rulerPlacement?.house != null) {
+    keys.add(`lord8:${eighth.rulerPlacement.house}`);
+  }
+
+  // Aspect patterns detected across the bodies (stellium, T-square, …).
+  for (const pat of analysis.patterns) keys.add(`pattern:${pat.type}`);
+
+  // Benefic soft contacts (trine/sextile) from Jupiter/Venus to a luminary —
+  // read straight from the computed aspect list.
+  const SOFT = new Set(["Trine", "Sextile"]);
+  const LUMINARIES = new Set(["Sun", "Moon"]);
+  for (const a of chart.aspects) {
+    if (!SOFT.has(a.type)) continue;
+    for (const benefic of ["Jupiter", "Venus"] as const) {
+      const touchesBenefic = a.a === benefic || a.b === benefic;
+      const other = a.a === benefic ? a.b : a.a;
+      if (touchesBenefic && LUMINARIES.has(other)) keys.add(`aspect:${benefic}-soft`);
+    }
+  }
+
+  // Planetary condition (dignity), read only for the bodies that carry a death
+  // chart — the luminaries and the mortal significators — and only for the
+  // notable conditions, so the reference stays meaningful rather than noisy.
+  const CONDITION_BODIES = new Set([
+    "Sun",
+    "Moon",
+    "Saturn",
+    "Mars",
+    "Pluto",
+  ]);
+  for (const d of analysis.dignities) {
+    if (!CONDITION_BODIES.has(d.planet)) continue;
+    const e = d.essential;
+    if (e.domicile) keys.add("dignity:domicile");
+    if (e.exaltation) keys.add("dignity:exaltation");
+    if (e.detriment) keys.add("dignity:detriment");
+    if (e.fall) keys.add("dignity:fall");
+    if (e.peregrine) keys.add("dignity:peregrine");
+  }
+
+  // Hard contacts from the malefics to a luminary or angle — surfaced per malefic,
+  // and, when the other end is a luminary, as a specific luminary–malefic pair.
+  for (const c of analysis.death.maleficContacts) {
+    if (c.malefic === "Saturn" || c.malefic === "Mars" || c.malefic === "Pluto") {
+      keys.add(`aspect:${c.malefic}-hard`);
+      if (c.body === "Sun" || c.body === "Moon") keys.add(`pair:${c.malefic}-${c.body}`);
+    }
+  }
+
+  // Chart conditions: a retrograde death-significator, and anaretic (29°) or
+  // cusp (0°) degree flags surfaced by the death-factor engine.
+  const SIGNIFICATOR_NAMES = new Set(
+    analysis.death.mortalSignificators.map((m) => m.name)
+  );
+  if (chart.planets.some((p) => p.retrograde && SIGNIFICATOR_NAMES.has(p.name))) {
+    keys.add("condition:retrograde");
+  }
+  for (const a of analysis.death.anaretic) {
+    if (a.kind.startsWith("anaretic")) keys.add("condition:anaretic");
+    else if (a.kind.startsWith("cusp")) keys.add("condition:cusp");
+  }
+
+  for (const h of analysis.death.houses) {
+    keys.add(`house:${h.house}`);
+    // Significators tenanting a death house — the most direct death testimony.
+    for (const occ of h.occupants ?? []) keys.add(`occupant:${h.house}:${occ}`);
+  }
+
+  for (const lot of analysis.lots) {
+    if (/^Part of Fortune/.test(lot.name)) keys.add("lot:Part of Fortune");
+    if (/^Lot of Death/.test(lot.name)) keys.add("lot:Lot of Death");
+  }
+
+  for (const f of analysis.fixedStars) keys.add(`star:${f.star}`);
+
+  return keys;
+}
+
+/** Priority order when trimming to a bounded set — spine factors lead. */
+const FAMILY_RANK: Record<DelineationEntry["family"], number> = {
+  moon: 0,
+  phase: 1,
+  ruler: 2,
+  asc: 3,
+  significator: 4,
+  occupant: 5,
+  lord8: 6,
+  dignity: 7,
+  aspect: 8,
+  pair: 9,
+  pattern: 10,
+  condition: 11,
+  house: 12,
+  lot: 13,
+  star: 14,
+  shape: 15,
+  sun: 16,
+  element: 17,
+  modality: 18,
+  sect: 19,
+};
+
+/**
+ * Select the delineation entries whose key matches a factor in this chart,
+ * de-duplicated by key and ranked so the interpretive spine (Moon, phase,
+ * significators, the death houses) comes first. Capped to keep the composition
+ * prompt bounded. Never throws — an empty corpus just yields no reference.
+ */
+export async function selectDelineations(
+  chart: DeathChart,
+  analysis: ChartAnalysis,
+  opts: { limit?: number } = {}
+): Promise<DelineationEntry[]> {
+  const limit = opts.limit ?? 36;
+  const docs = await getDelineations();
+  const all = delineationEntries(docs);
+  if (!all.length) return [];
+
+  const active = activeFactorKeys(chart, analysis);
+  const seen = new Set<string>();
+  const matched = all.filter((e) => {
+    if (!active.has(e.key) || seen.has(e.key)) return false;
+    seen.add(e.key);
+    return true;
+  });
+
+  matched.sort(
+    (a, b) => (FAMILY_RANK[a.family] ?? 99) - (FAMILY_RANK[b.family] ?? 99)
+  );
+  return matched.slice(0, limit);
+}
+
+// ── Natal delineation corpus: retrieval ─────────────────────────────────────
+// The natal-framed layer (Sun/Moon/Ascendant by sign, "who this soul was"). Same
+// factor-key scheme as the death corpus, so it reuses activeFactorKeys — but
+// pointed at the NATIVITY, and matched against the natal corpus only. Folded into
+// the Tier-2 sections when birth details are supplied.
+
+/** Load the active natal delineation documents (Supabase override, bundled). */
+export function getNatalDelineations(): Promise<KnowledgeDocument[]> {
+  return loadKnowledge("natal_delineation");
+}
+
+/**
+ * Select the natal delineations for the factors present in the NATIVITY. Reuses
+ * the same key derivation and family ranking as the death retrieval, pointed at
+ * the natal chart and matched against the natal corpus only. Capped tight
+ * because the natal layer supports only the Tier-2 identity sections. Never
+ * throws.
+ */
+export async function selectNatalDelineations(
+  natalChart: DeathChart,
+  natalAnalysis: ChartAnalysis,
+  opts: { limit?: number } = {}
+): Promise<DelineationEntry[]> {
+  const limit = opts.limit ?? 8;
+  const docs = await getNatalDelineations();
+  const all = delineationEntries(docs);
+  if (!all.length) return [];
+
+  const active = activeFactorKeys(natalChart, natalAnalysis);
+  const seen = new Set<string>();
+  const matched = all.filter((e) => {
+    if (!active.has(e.key) || seen.has(e.key)) return false;
+    seen.add(e.key);
+    return true;
+  });
+  matched.sort(
+    (a, b) => (FAMILY_RANK[a.family] ?? 99) - (FAMILY_RANK[b.family] ?? 99)
+  );
+  return matched.slice(0, limit);
+}
+
+/**
+ * Render selected delineations into the Markdown reference block folded into the
+ * composition pass. Grouped by family with light headers; every body is doctrine
+ * to SYNTHESIZE, never to quote.
+ */
+export function delineationBrief(entries: DelineationEntry[]): string {
+  if (!entries.length) return "";
+  const FAMILY_HEADING: Record<DelineationEntry["family"], string> = {
+    moon: "The Soul's Vehicle — the Moon",
+    phase: "The Lunar Phase",
+    ruler: "The Ruling Hand",
+    asc: "The Rising Sign (the Horizon at the Crossing)",
+    significator: "The Mortal Significators & Karmic Axis",
+    occupant: "Significators in the Death Houses",
+    lord8: "The Lord of the 8th, by House",
+    dignity: "Planetary Condition (Dignity)",
+    aspect: "Aspect Contacts",
+    pair: "Luminary–Malefic Contacts",
+    pattern: "Aspect Patterns",
+    condition: "Chart Conditions",
+    house: "The Death-House Complex (8th · 4th · 12th)",
+    lot: "The Lots",
+    star: "Fixed-Star Contacts",
+    shape: "The Shape of the Whole",
+    sun: "The Luminary — the Sun",
+    element: "The Elemental Cast",
+    modality: "The Modal Cast",
+    sect: "The Sect of the Chart",
+  };
+
+  const order = Object.keys(FAMILY_RANK) as DelineationEntry["family"][];
+  const byFamily = new Map<DelineationEntry["family"], DelineationEntry[]>();
+  for (const e of entries) {
+    const list = byFamily.get(e.family) ?? [];
+    list.push(e);
+    byFamily.set(e.family, list);
+  }
+
+  const blocks: string[] = [];
+  for (const fam of order) {
+    const list = byFamily.get(fam);
+    if (!list?.length) continue;
+    blocks.push(`### ${FAMILY_HEADING[fam]}`);
+    for (const e of list) {
+      const src = e.source ? ` _(tradition: ${e.source})_` : "";
+      blocks.push(`- **${e.title}** — ${e.body}${src}`);
+    }
+  }
+  return blocks.join("\n");
+}
+
+/**
+ * Render the natal delineations as a flat, natal-framed block (the entry titles
+ * already name the factor, so no death-framed family headings). For the Tier-2
+ * "The Life That Was" material.
+ */
+export function natalBrief(entries: DelineationEntry[]): string {
+  if (!entries.length) return "";
+  return entries
+    .map((e) => {
+      const src = e.source ? ` _(tradition: ${e.source})_` : "";
+      return `- **${e.title}** — ${e.body}${src}`;
+    })
+    .join("\n");
+}
+
+// ── Classical passages: retrieval ───────────────────────────────────────────
+// Verbatim public-domain excerpts (kind `classical_source`, carried in
+// `metadata.passages`), retrieved by the same factor keys as the delineations
+// and folded into composition as a secondary reference — the tradition in its
+// own words, alongside the practice's original delineations.
+
+/** Load the active classical-source documents (Supabase override, bundled). */
+export function getClassicalSources(): Promise<KnowledgeDocument[]> {
+  return loadKnowledge("classical_source");
+}
+
+/** Flatten the `metadata.passages` of a set of classical-source documents. */
+export function classicalPassages(docs: KnowledgeDocument[]): ClassicalPassage[] {
+  const out: ClassicalPassage[] = [];
+  for (const d of docs) {
+    const passages = d.metadata?.passages;
+    if (Array.isArray(passages)) {
+      for (const p of passages) {
+        if (
+          p &&
+          typeof p.key === "string" &&
+          typeof p.text === "string" &&
+          typeof p.work === "string"
+        ) {
+          out.push(p as ClassicalPassage);
+        }
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Select the public-domain passages whose key matches a factor in this chart,
+ * de-duplicated by key, ranked spine-first, and capped tight (these are a
+ * secondary reference, not the spine). Never throws.
+ */
+export async function selectClassicalPassages(
+  chart: DeathChart,
+  analysis: ChartAnalysis,
+  opts: { limit?: number } = {}
+): Promise<ClassicalPassage[]> {
+  const limit = opts.limit ?? 4;
+  const docs = await getClassicalSources();
+  const all = classicalPassages(docs);
+  if (!all.length) return [];
+
+  const active = activeFactorKeys(chart, analysis);
+  const seen = new Set<string>();
+  const matched = all.filter((p) => {
+    if (!active.has(p.key) || seen.has(p.key)) return false;
+    seen.add(p.key);
+    return true;
+  });
+
+  const famOf = (key: string) => key.split(":")[0] as DelineationEntry["family"];
+  matched.sort(
+    (a, b) => (FAMILY_RANK[famOf(a.key)] ?? 99) - (FAMILY_RANK[famOf(b.key)] ?? 99)
+  );
+  return matched.slice(0, limit);
+}
+
+/** Render selected passages into the compact classical-reference block. */
+export function classicalBrief(passages: ClassicalPassage[]): string {
+  if (!passages.length) return "";
+  return passages
+    .map((p) => `- "${p.text}" — ${p.work}, ${p.ref}`)
+    .join("\n");
 }

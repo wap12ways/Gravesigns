@@ -132,6 +132,30 @@ export interface VerificationReport {
   issues: string[];
 }
 
+/**
+ * One core theme in the reading plan (Pass S — Synthesis). A professional
+ * astrologer, in the hours of prep before a session, distils the chart into a
+ * handful of themes the reading must carry — each supported by several concordant
+ * testimonies. This is that plan, made explicit for the composer to build on.
+ */
+export interface ReadingTheme {
+  /** The theme in a phrase, e.g. "A crossing held in depth and surrender". */
+  title: string;
+  /** The concordant testimonies that support it (placements, contacts, lots). */
+  threads: string[];
+  /** How to weight and voice it in the reading. */
+  emphasis: string;
+}
+
+export interface ReadingPlan {
+  /** The 3–5 core themes the reading is built around. */
+  themes: ReadingTheme[];
+  /** The narrative arc — the order and movement the reading should follow. */
+  arc: string;
+  /** What to touch only lightly or leave unsaid (never cause/manner/date/span). */
+  hold_back: string;
+}
+
 // ── Knowledge corpus ────────────────────────────────────────────────────────
 // A general, versioned store of the proprietary compilation of public reference
 // material the reading engine draws on. Ethics is the first kind; more kinds
@@ -140,6 +164,16 @@ export interface VerificationReport {
 // optionally, new `KnowledgeKind` values.
 export type KnowledgeKind =
   | "code_of_ethics"
+  // The interpretive corpus: factor-keyed delineations the composition pass
+  // draws on for depth (Moon-by-sign, the mortal significators, the death
+  // houses, the Lots, the fixed stars). Entries ride in `metadata.entries`.
+  | "delineation"
+  // The natal-framed interpretive corpus (Sun/Moon/Ascendant by sign, "who this
+  // soul was"), retrieved from the nativity for the Tier-2 sections.
+  | "natal_delineation"
+  // A vetted bibliography of PUBLIC-DOMAIN classical sources — the legal-path
+  // corpus the practice may ingest and store, with per-work rights status.
+  | "classical_source"
   // Reserved for later phases — listed so the type never has to be widened in a
   // breaking way. Consumers should treat KnowledgeKind as open-ended.
   | "association_standard"
@@ -148,6 +182,52 @@ export type KnowledgeKind =
   | "published_reading"
   | "case_data"
   | (string & {});
+
+/**
+ * One interpretive delineation in the death-chart corpus (kind `delineation`).
+ * The composition pass reads only the entries whose `key` matches a factor
+ * actually present in the chart, so the reference stays targeted, not a dump.
+ * The bodies are traditional doctrine read as MEANING — never a cause, manner,
+ * date, or length of death, and never quoted verbatim into the reading.
+ */
+export interface DelineationEntry {
+  /**
+   * The match token the retrieval derives from the live chart, e.g.
+   * "moon:Scorpio", "phase:Full Moon", "sect:night", "significator:Saturn",
+   * "house:8", "lot:Lot of Death", "star:Algol", "shape:Bowl", "element:Water".
+   */
+  key: string;
+  /** The factor family, used to rank and group what is retrieved. */
+  family:
+    | "moon"
+    | "sun"
+    | "phase"
+    | "sect"
+    | "element"
+    | "modality"
+    | "shape"
+    | "significator"
+    | "ruler"
+    | "asc"
+    | "occupant"
+    | "lord8"
+    | "dignity"
+    | "aspect"
+    | "pair"
+    | "pattern"
+    | "condition"
+    | "house"
+    | "lot"
+    | "star";
+  /** Short label shown in the reference brief. */
+  title: string;
+  /** The interpretive delineation — traditional doctrine, tender and precise. */
+  body: string;
+  /** The tradition the doctrine comes from — a study trail, not a quotation. */
+  source?: string;
+  /** Whether the entry reads on a single moment, a nativity, or both. */
+  applies?: "moment" | "natal" | "both";
+}
 
 /**
  * One document in the knowledge corpus. `content` is the canonical text
@@ -182,6 +262,25 @@ export interface KnowledgeSection {
   ref: string;
   heading: string;
   body: string;
+}
+
+/**
+ * One verbatim excerpt from a PUBLIC-DOMAIN primary source (kind
+ * `classical_source`, carried in `metadata.passages`). Retrieved by the same
+ * factor keys as the delineations and folded into the composition pass as a
+ * secondary reference — the tradition in its own words. Only temperament /
+ * nature passages are stored; anything asserting a cause or manner of death is
+ * deliberately excluded, as the practice never reads for cause or manner.
+ */
+export interface ClassicalPassage {
+  /** Factor key, same scheme as delineations, e.g. "significator:Saturn". */
+  key: string;
+  /** The work, e.g. "Ptolemy, Tetrabiblos". */
+  work: string;
+  /** The citation, e.g. "Book I, ch. 4 (Ashmand trans., 1822; public domain)". */
+  ref: string;
+  /** The verbatim excerpt (typography normalized; wording unchanged). */
+  text: string;
 }
 
 /**

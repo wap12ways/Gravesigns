@@ -11,9 +11,12 @@ import type {
   SubjectType,
 } from "@/lib/types";
 
-// The reading now runs three sequential Claude passes (judgment → composition →
-// verification), so it needs real headroom. Vercel honours this up to the plan's
-// ceiling — 300s on Pro/Enterprise, capped to 60s on Hobby.
+// The reading runs six sequential Claude passes (judgment → synthesis →
+// composition → ethics → verification → study notes), so it needs real headroom.
+// The passes are model-tiered by default (Opus for the reading, Sonnet for the
+// five ancillary passes) to fit inside the limit. Vercel honours maxDuration up
+// to the plan's ceiling — 300s on Pro/Enterprise, capped to 60s on Hobby (where
+// the all-Opus profile will time out; keep the tiered default there).
 export const maxDuration = 300;
 export const runtime = "nodejs";
 
@@ -152,8 +155,8 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // 2) Generate the reading through the three-pass pipeline
-  //    (Step-0 analysis → judgment → composition → verification).
+  // 2) Generate the reading through the pipeline (Step-0 analysis → judgment →
+  //    composition → ethics → verification → study notes).
   let reading: string;
   let dossier: JudgmentDossier | null = null;
   let ethicsReview: EthicsReview | null = null;

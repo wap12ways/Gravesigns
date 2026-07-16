@@ -1,20 +1,28 @@
 /**
- * The three-pass reading pipeline.
+ * The reading pipeline — one deterministic step and six Claude passes. Every
+ * pass picks its model from MODELS (default claude-opus-4-8, per-pass overridable).
  *
  *   Step 0  (deterministic, no AI) — computeChartAnalysis() tabulates every
  *           classical testimony from the raw chart.
- *   Pass A  Judgment      — Sonnet reads the evidence brief and returns a
+ *   Pass A  Judgment      — the model reads the evidence brief and returns a
  *                           structured, weighted dossier (JSON, tool-forced).
  *                           It weighs; it never composes or predicts cause/date.
- *   Pass B  Composition   — Sonnet turns the dossier + subject context into the
- *                           finished prose reading, born aligned to a short
- *                           ethical covenant loaded from the knowledge corpus.
- *   Pass E  Ethical Alignment — Sonnet audits the finished prose against the
+ *   Pass S  Synthesis     — the model distils the dossier into an explicit
+ *                           reading plan (3–5 core themes + arc), mirroring a
+ *                           practitioner's pre-session prep. Feeds composition.
+ *   Pass B  Composition   — the model turns the dossier + subject context into
+ *                           the finished prose reading, born aligned to a short
+ *                           ethical covenant, and deepened by the interpretive
+ *                           delineations and public-domain passages retrieved for
+ *                           the factors present in this chart.
+ *   Pass E  Ethical Alignment — the model audits the finished prose against the
  *                           loaded Code(s) of Ethics and revises it once if it
  *                           is materially misaligned. Runs after B, before C.
- *   Pass C  Verification  — Sonnet audits the draft against the chart for
+ *   Pass C  Verification  — the model audits the draft against the chart for
  *                           fabricated placements, forbidden claims, and tone,
  *                           and the draft is revised once if it fails.
+ *   Pass N  Study Notes   — the model keeps the practitioner's working notebook
+ *                           on the chart. Additive; runs last, degrades to null.
  *
  * Each pass degrades gracefully: if a later pass errors, the last good output
  * is returned so a reading is always produced.
@@ -31,33 +39,56 @@ import type {
   KnowledgeDocument,
   StudyNotes,
   StudyNote,
+  ReadingPlan,
+  ReadingTheme,
 } from "./types";
 import { computeChartAnalysis } from "./analysis";
 import { analysisToText, natalContextToText } from "./analysis/serialize";
 import { computeLifespan } from "./analysis/lifespan";
 import { computeCrossAspects } from "./analysis/synastry";
-import { getCodesOfEthics, operatingSummary, codeLabel } from "./knowledge";
+import {
+  getCodesOfEthics,
+  operatingSummary,
+  codeLabel,
+  selectDelineations,
+  delineationBrief,
+  selectNatalDelineations,
+  natalBrief,
+  selectClassicalPassages,
+  classicalBrief,
+} from "./knowledge";
 
 /**
- * Per-pass model selection. Every pass defaults to Opus 4.8 (the "showcase"
- * profile) and is independently overridable by environment variable, so the
- * pipeline can be tiered later (e.g. Sonnet for judgment, Haiku for the audits)
- * without any code change. `ANTHROPIC_MODEL` sets the fallback default for all
- * passes at once.
+ * Per-pass model selection, tiered for latency by default.
  *
- * Rewrites are deliberately NOT their own knob: both the ethics and the
- * verification rewrite regenerate the family-facing reading, so they always run
- * on the composition model. That keeps the finished prose at composition grade
- * no matter how cheap the audits are tiered down to.
+ * The reading now runs SIX sequential Claude passes; with every one on Opus the
+ * request can exceed a serverless function's time limit. So the family-facing
+ * READING stays Opus-grade — composition and both rewrites (which regenerate the
+ * reading) run on `DEFAULT_MODEL`, Opus 4.8 — while the five ancillary passes
+ * (judgment, synthesis, ethics audit, verification, study notes) default to a
+ * faster model, `AUX_MODEL` (Sonnet 5). This keeps the prose at composition
+ * grade while roughly halving the critical-path time.
+ *
+ * Every knob is overridable:
+ *   - ANTHROPIC_MODEL          → forces ALL passes to one model (e.g. set it to
+ *                                claude-opus-4-8 to restore the all-Opus profile).
+ *   - ANTHROPIC_MODEL_AUX      → the default for the ancillary passes.
+ *   - ANTHROPIC_MODEL_<PASS>   → overrides a single pass.
+ * Rewrites are deliberately NOT their own knob: they always run on the
+ * composition model, so the finished prose stays at composition grade no matter
+ * how cheaply the audits are tiered.
  */
 const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-4-8";
+const AUX_MODEL =
+  process.env.ANTHROPIC_MODEL || process.env.ANTHROPIC_MODEL_AUX || "claude-sonnet-5";
 
 export const MODELS = {
-  judgment: process.env.ANTHROPIC_MODEL_JUDGMENT || DEFAULT_MODEL,
+  judgment: process.env.ANTHROPIC_MODEL_JUDGMENT || AUX_MODEL,
+  themes: process.env.ANTHROPIC_MODEL_THEMES || AUX_MODEL,
   composition: process.env.ANTHROPIC_MODEL_COMPOSITION || DEFAULT_MODEL,
-  ethics: process.env.ANTHROPIC_MODEL_ETHICS || DEFAULT_MODEL,
-  verification: process.env.ANTHROPIC_MODEL_VERIFICATION || DEFAULT_MODEL,
-  studyNotes: process.env.ANTHROPIC_MODEL_STUDY_NOTES || DEFAULT_MODEL,
+  ethics: process.env.ANTHROPIC_MODEL_ETHICS || AUX_MODEL,
+  verification: process.env.ANTHROPIC_MODEL_VERIFICATION || AUX_MODEL,
+  studyNotes: process.env.ANTHROPIC_MODEL_STUDY_NOTES || AUX_MODEL,
 } as const;
 
 /**
@@ -66,6 +97,16 @@ export const MODELS = {
  * route and any caller that persists a `model` field.
  */
 export const READING_MODEL = MODELS.composition;
+
+/**
+ * Token ceiling for every pass that emits the full family-facing reading —
+ * the composition itself and the two rewrites (ethics, verification). Sized for
+ * the deepened section architecture (~1800–2600 words, ~10 sections, up to 13
+ * with a nativity): 6144 tokens is ~4,600 words of headroom over a 2,600-word
+ * target, so a rich reading is never truncated, without paying for output tokens
+ * (and the wall-clock time) the reading never uses.
+ */
+const COMPOSITION_MAX_TOKENS = 6144;
 
 export interface PipelineArgs {
   fullName: string;
@@ -112,13 +153,14 @@ function subjectLine(args: PipelineArgs): string {
 
 const JUDGMENT_SYSTEM = `You are the senior technical astrologer of GraveSigns, a death-chart practice. Your ONLY job in this pass is JUDGMENT — to read a pre-computed evidence brief and distill it into a weighted dossier of testimonies for a colleague who will write the reading.
 
-You are fluent in traditional and modern technique: essential and accidental dignity (Lilly's point scheme), sect, the Arabic Lots, the 8th/4th/12th complexes, the mortal significators (Saturn, Mars, Moon, Sun, the Nodes, Pluto), fixed stars, aspect patterns, and chart shape.
+You are fluent in traditional and modern technique: essential and accidental dignity (Lilly's point scheme), sect, the Arabic Lots, the 8th/4th/12th complexes, the mortal significators (Saturn, Mars, Moon, Sun, the Nodes, Pluto), the Ascendant and the ruler of the geniture, the lord of the 8th and where it is carried, the significators tenanting the 8th/4th/12th, the hard luminary–malefic contacts, fixed stars, aspect patterns, and chart shape.
 
 RULES OF THIS PASS
 - Work ONLY from the numbers in the brief. Never recompute astronomy; never invent a placement not present.
 - Produce EVIDENCE, not prose. Each factor is one source-anchored technical observation with an interpretive direction.
 - Weight by real astrological strength: dignity, angularity, tightness of orb, concordance across independent testimonies, and whether the factor depends on a birth time that may be missing.
 - Prefer testimonies that CONCUR. When three independent factors point at the same theme, say so via concordance.
+- Weight the DEATH-SPECIFIC testimonies highly: a significator (a malefic or a luminary) tenanting the 8th, 4th, or 12th, the condition and disposition of the lord of the 8th, and a hard luminary–malefic contact are among the weightiest evidence a death chart offers. Surface them as high-weight factors so the composer builds on them.
 - Be honest about limits. If houses/angles are absent, down-weight or suppress house-dependent and length-of-life techniques and record them in suppressed_techniques.
 - ABSOLUTELY FORBIDDEN: stating or implying a cause of death, a manner of death, a specific date, or any PREDICTION. This is a chart of a moment that already happened; you illuminate its meaning, you do not diagnose or predict. Flag any factor that tempts such a claim as indeterminate and steer its direction toward meaning, not mechanism.
 - If the brief contains the length-of-life doctrine (hyleg/alcocoden), you MAY record it DESCRIPTIVELY — as a classical technique read beside a life already complete, with the actual age noted for comparison. Never present it as having predicted or caused the death, and never extend it into a counterfactual.
@@ -169,7 +211,17 @@ const JUDGMENT_TOOL: Anthropic.Tool = {
   },
 };
 
-async function runJudgment(args: PipelineArgs, brief: string): Promise<JudgmentDossier> {
+async function runJudgment(
+  args: PipelineArgs,
+  brief: string,
+  reference: string,
+  classical: string
+): Promise<JudgmentDossier> {
+  const sources = sourcesBlock(
+    reference,
+    classical,
+    "weigh the brief's factors with this doctrine in mind — let it inform the direction and weight you assign; never let it introduce a placement not in the brief"
+  );
   const msg = await client().messages.create({
     model: MODELS.judgment,
     max_tokens: 4096,
@@ -179,7 +231,11 @@ async function runJudgment(args: PipelineArgs, brief: string): Promise<JudgmentD
     messages: [
       {
         role: "user",
-        content: `SUBJECT\n${subjectLine(args)}\n\nEVIDENCE BRIEF (pre-computed — every number is authoritative)\n\`\`\`\n${brief}\n\`\`\`\n\nProduce the judgment dossier now.`,
+        content:
+          `SUBJECT\n${subjectLine(args)}\n\n` +
+          `EVIDENCE BRIEF (pre-computed — every number is authoritative)\n\`\`\`\n${brief}\n\`\`\`\n\n` +
+          sources +
+          `Produce the judgment dossier now.`,
       },
     ],
   });
@@ -222,11 +278,123 @@ function dossierToText(d: JudgmentDossier): string {
 
 /* ------------------------------------------------------------------ Pass B */
 
+/* ------------------------------------------------------------------ Pass S */
+/* Synthesis / Preparation — the reading plan. Before a live session a
+ * professional spends hours turning the raw chart into a handful of core themes,
+ * each supported by concordant testimonies, with a narrative arc and a sense of
+ * what to hold back. This pass makes that prep explicit: it reads the weighted
+ * dossier (and the retrieved reference) and returns a ReadingPlan the composer
+ * builds on, so the reading is thematically coherent rather than a walk through
+ * placements. Runs after judgment, before composition. Degrades gracefully — a
+ * failure just means the composer works from the dossier alone, as before. */
+
+const THEMES_SYSTEM = `You are the resident astrologer of GraveSigns preparing to write a death-chart reading. Before you compose, you do what a professional does in the hours before a session: you study the weighted dossier and distil the whole chart into the FEW CORE THEMES the reading must carry, and you plan how they fit together.
+
+Your job in this pass is the READING PLAN — not prose, not new astrology. Work only from the dossier and the reference provided; never introduce a placement not present, and never state or imply a cause, manner, date, or length of death.
+
+Produce:
+- THEMES: three to five core themes, each a short phrase that names something true about this crossing. For each, list the CONCORDANT THREADS — the specific testimonies (placements, dignities, contacts, houses, lots, stars) that independently point at it — and a note on how to weight and voice it. Build themes from CONCORDANCE: a theme carried by several independent testimonies is stronger than a lone placement.
+- ARC: the narrative movement of the reading — where to begin, how the themes should unfold into one another, where it should land.
+- HOLD_BACK: what to touch only lightly or leave unsaid — thin testimony, anything that would frighten, and always cause/manner/date/span.
+
+Call record_reading_plan exactly once.`;
+
+const THEMES_TOOL: Anthropic.Tool = {
+  name: "record_reading_plan",
+  description: "Record the reading plan the composer will build on.",
+  input_schema: {
+    type: "object",
+    properties: {
+      themes: {
+        type: "array",
+        description: "The 3–5 core themes, strongest first.",
+        items: {
+          type: "object",
+          properties: {
+            title: { type: "string", description: "The theme in a short phrase." },
+            threads: {
+              type: "array",
+              items: { type: "string" },
+              description: "The concordant testimonies that support this theme.",
+            },
+            emphasis: { type: "string", description: "How to weight and voice it." },
+          },
+          required: ["title", "threads", "emphasis"],
+        },
+      },
+      arc: { type: "string", description: "The narrative arc — begin, unfold, land." },
+      hold_back: { type: "string", description: "What to touch lightly or leave unsaid." },
+    },
+    required: ["themes", "arc", "hold_back"],
+  },
+};
+
+async function runThemeSynthesis(
+  args: PipelineArgs,
+  brief: string,
+  dossier: JudgmentDossier,
+  reference: string,
+  classical: string
+): Promise<ReadingPlan> {
+  const sources = sourcesBlock(
+    reference,
+    classical,
+    "the doctrine behind the dossier's factors — use it to see which testimonies concur; never let it introduce a placement not in the brief"
+  );
+  const msg = await client().messages.create({
+    model: MODELS.themes,
+    max_tokens: 1536,
+    system: THEMES_SYSTEM,
+    tools: [THEMES_TOOL],
+    tool_choice: { type: "tool", name: "record_reading_plan" },
+    messages: [
+      {
+        role: "user",
+        content:
+          `SUBJECT\n${subjectLine(args)}\n\n` +
+          `JUDGMENT DOSSIER (the weighted evidence)\n\`\`\`\n${dossierToText(dossier)}\n\`\`\`\n\n` +
+          `CHART FRAME\n\`\`\`\n${brief}\n\`\`\`\n\n` +
+          sources +
+          `Produce the reading plan now.`,
+      },
+    ],
+  });
+  const block = msg.content.find(
+    (b): b is Anthropic.ToolUseBlock =>
+      b.type === "tool_use" && b.name === "record_reading_plan"
+  );
+  if (!block) return { themes: [], arc: "", hold_back: "" };
+  const raw = block.input as Partial<ReadingPlan>;
+  return {
+    themes: (raw.themes ?? []) as ReadingTheme[],
+    arc: raw.arc ?? "",
+    hold_back: raw.hold_back ?? "",
+  };
+}
+
+function readingPlanToText(plan: ReadingPlan): string {
+  if (!plan.themes.length && !plan.arc.trim()) return "";
+  const L: string[] = [];
+  if (plan.themes.length) {
+    L.push("CORE THEMES (build the reading around these, strongest first):");
+    plan.themes.forEach((t, i) => {
+      L.push(`${i + 1}. ${t.title}`);
+      if (t.threads.length) L.push(`   concordant threads: ${t.threads.join("; ")}`);
+      if (t.emphasis.trim()) L.push(`   emphasis: ${t.emphasis.trim()}`);
+    });
+  }
+  if (plan.arc.trim()) L.push(`\nARC: ${plan.arc.trim()}`);
+  if (plan.hold_back.trim()) L.push(`HOLD BACK: ${plan.hold_back.trim()}`);
+  return L.join("\n");
+}
+
 const COMPOSITION_SYSTEM = `You are the resident astrologer of GraveSigns, a practice within the Truestherb platform devoted to Death Chart Readings — the astrology of the moment a soul crosses the threshold, whether that soul wore a human life or the life of a beloved animal.
 
 You have practiced for more than twenty years and specialize exclusively in charts of death, dying, and transition. Grieving families are sent to you when they want something more than sympathy: a reading that treats the moment of passing as meaningful, legible, and whole.
 
 In this pass you COMPOSE. A colleague has already done the technical judgment and handed you a weighted dossier of testimonies with sources, directions, and themes. Trust it. Build the reading around the highest-weight testimonies and the primary themes, letting the concordant ones carry the spine of the piece. Do not introduce placements that are not in the dossier or the chart frame.
+
+You are also given an INTERPRETIVE REFERENCE: short traditional delineations for the factors actually present in this chart (the Moon's sign, the lunar phase, the mortal significators, the death-house complex, the Lots, the fixed stars in contact). This is the doctrine a practitioner carries in their head — draw on it for depth, texture, and the tradition behind each testimony. Synthesize it into your own tender prose; never quote it verbatim, never list it, and never let it introduce a factor the chart frame does not contain. Where the reference is silent on a factor the dossier weights highly, read that factor from your own craft.
 
 VOICE AND POSTURE
 - Warm, unhurried, dignified. Every sentence should feel safe to read at 3 a.m.
@@ -240,22 +408,36 @@ INTEGRITY
 - Weave technique into meaning — don't list "Moon in Scorpio, 8th house," say what the soul's vehicle passing through that water carries.
 - When houses/angles were absent, lean gracefully on signs, dignities, lots by sign, aspects, and the Moon; never fabricate an angle.
 
-STRUCTURE (Markdown; "## " for sections, "### " for sub-labels). ~800–1200 words:
+DEPTH — this reading must feel like a long, unhurried in-person session, not a summary. Give each major section TWO to FOUR substantial paragraphs; never settle for a single thin one. Lead with the whole and then descend into the particular.
+
+- NAME the real placements as you interpret them — the sign, the house, the dignity, the specific aspect or contact — and then say what each MEANS for this soul. Precision about the astrology is what makes the tenderness land.
+- Build each theme from MORE THAN ONE testimony. When several factors concur — a significator, its house, an aspect, a lot, a fixed star all pointing the same way — name that concordance explicitly and let the agreement carry weight. This is the heart of the craft.
+- Draw fully on the interpretive reference and the primary sources for the factors present: the death-house occupants, the luminary–malefic contacts, the ruling hand, the karmic axis. These are the meat of the reading — do not gesture at them, inhabit them.
+- Hold contradictions rather than flattening them; a soul, and a sky, can carry opposite truths at once.
+- Earn the length with texture, specificity, and tenderness — never with repetition, hedging, or filler.
+
+STRUCTURE (Markdown; "## " for sections, "### " for sub-labels). ~1800–2600 words:
 
 ## The Threshold
-Two or three arresting sentences naming the person and the essential signature of their crossing.
+Two or three arresting sentences naming the person and the essential signature of their crossing. Set the whole reading's key here.
 
-## The Sky at the Crossing
-The whole-chart portrait — sect, dominant element/modality, chart shape, Moon phase — and what the shape of the whole says about this passing.
+## The Shape of the Whole
+The gestalt, read first: the chart shape, the hemispheric weighting, the dominant element and modality, the sect (day/night), and the Moon's phase. What does the *shape* of this entire sky say about the passing before any single placement is named? This is the overview a professional gives before the details.
 
 ## The Soul's Vehicle — Moon and the Luminaries
-The Moon (and Sun) by sign, dignity, and house/angle if present. The spiritual heart of the reading.
+The Moon (and Sun) by sign, dignity, and house/angle if present — the spiritual heart of the reading. The vessel that crossed, and its final condition. Let this be among the fullest sections.
+
+## The Ruling Hand
+The planet that governs this sky — the ruler of the Ascendant, or (when angles are absent) the almuten of the Ascendant degree or the chart's final dispositor — read as the hand that guided the passage. Where the chart offers no angle, lean gracefully on the dispositor or almuten by sign; never fabricate an Ascendant.
 
 ## Thresholds and Guardians
-The mortal significators and the 8th/4th/12th complex — Saturn, Pluto, the Nodes, the ruler of the 8th — and the death-lot(s), read as meaning.
+The heart of the death reading, and usually its fullest section. Weave the 8th/4th/12th complex — any significator TENANTING those houses (a body in the 8th, 4th, or 12th is the most direct testimony the chart offers), the ruler of the 8th, the 4th as the place of rest, the 12th as the hidden approach — together with the mortal significators (Saturn, Mars, Pluto, the luminaries, the Nodes), any hard luminary–malefic contact, and the death-lot(s). Name where these concur. Read all of it as meaning and as guardianship — never as a cause, a manner, or a moment of death.
+
+## The Karmic Axis
+The lunar Nodes: the South Node as what is laid down at the gate, the familiar released; the North Node as the direction the soul faced as it crossed. Include any planet conjunct the nodes. (Omit this section only if the chart frame shows no nodal testimony.)
 
 ## The Weave of Aspects
-The two or three most significant patterns/aspects (highest weight, tightest orb) as a living pattern, and any fixed-star contact that concurs.
+The two or three most significant patterns/aspects (highest weight, tightest orb) as a living pattern, and any fixed-star contact that concurs. Read the aspects as relationship, not geometry.
 
 ## Gifts Carried Forward
 What this soul leaves those who loved them — strengths, graces, the imprint of a life.
@@ -302,16 +484,51 @@ function covenantBlock(ethicalCovenant: string): string {
   return `\n\nETHICAL COVENANT (you write within these professional standards)\n${ethicalCovenant.trim()}`;
 }
 
+/**
+ * The retrieved reference material — the interpretive delineations and the
+ * verbatim public-domain passages for the factors present in this chart — framed
+ * for whichever pass consumes it. Folded into EVERY pass that benefits (judgment,
+ * composition, the two rewrites, verification, study notes) so the whole bundled
+ * output the frontend receives is built on the same sourced corpus, not just the
+ * raw number-brief. Returns "" when nothing was retrieved, so callers can splice
+ * it in unconditionally.
+ */
+function sourcesBlock(reference: string, classical: string, guidance: string): string {
+  const parts: string[] = [];
+  if (reference.trim()) {
+    parts.push(
+      `INTERPRETIVE REFERENCE (traditional delineations for the factors present in this chart — ${guidance})\n\`\`\`\n${reference.trim()}\n\`\`\``
+    );
+  }
+  if (classical.trim()) {
+    parts.push(
+      `PRIMARY SOURCES (verbatim public-domain passages on the temperament of these bodies — the tradition in its own words; never a claim of a cause or manner of death)\n\`\`\`\n${classical.trim()}\n\`\`\``
+    );
+  }
+  return parts.length ? parts.join("\n\n") + "\n\n" : "";
+}
+
 async function runComposition(
   args: PipelineArgs,
   brief: string,
   dossier: JudgmentDossier,
   hasNatal: boolean,
-  ethicalCovenant: string
+  ethicalCovenant: string,
+  reference: string,
+  classical: string,
+  plan: string
 ): Promise<string> {
+  const sources = sourcesBlock(
+    reference,
+    classical,
+    "synthesize for depth and texture; never quote or list them, and never introduce a factor not in the frame"
+  );
+  const planBlock = plan.trim()
+    ? `READING PLAN (your prepared synthesis — build the reading around these themes and this arc; it is your own plan, follow it)\n\`\`\`\n${plan.trim()}\n\`\`\`\n\n`
+    : "";
   const stream = client().messages.stream({
     model: MODELS.composition,
-    max_tokens: 4608,
+    max_tokens: COMPOSITION_MAX_TOKENS,
     system:
       COMPOSITION_SYSTEM +
       (hasNatal ? TIER2_ADDENDUM : "") +
@@ -322,7 +539,9 @@ async function runComposition(
         content:
           `SUBJECT\n${subjectLine(args)}\n\n` +
           `JUDGMENT DOSSIER (compose from this — it is authoritative)\n\`\`\`\n${dossierToText(dossier)}\n\`\`\`\n\n` +
+          planBlock +
           `CHART FRAME (for exact placements you may name)\n\`\`\`\n${brief}\n\`\`\`\n\n` +
+          sources +
           `Compose the reading now.`,
       },
     ],
@@ -342,7 +561,7 @@ async function runComposition(
 const VERIFY_SYSTEM = `You are the reviewing astrologer of GraveSigns. You audit a drafted death-chart reading against the chart it was built from. You are strict about integrity and gentle about voice.
 
 Check for, in order:
-1. FABRICATION — any placement, sign, house, aspect, dignity, lot, or fixed star named in the reading that is NOT present in the chart frame or dossier. This is the gravest fault.
+1. FABRICATION — any placement, sign, house, aspect, dignity, lot, or fixed star named in the reading that is NOT present in the chart frame or dossier. This is the gravest fault. (The reading was also given an INTERPRETIVE REFERENCE and PRIMARY SOURCES; sourced interpretive language drawn from them is legitimate — judge fabrication only on named placements, not on traditional phrasing.)
 2. FORBIDDEN CLAIMS — any statement or clear implication of a cause of death, manner of death, a specific date, or a length/span of life. Also flag prediction of the future or medical/diagnostic language.
 3. TONE — anything cold, sensational, frightening, moralizing, or clichéd; anything unsafe to read in grief.
 4. STRUCTURE — missing required sections or a wildly wrong length.
@@ -365,8 +584,15 @@ const VERIFY_TOOL: Anthropic.Tool = {
 async function runVerification(
   brief: string,
   dossier: JudgmentDossier,
-  reading: string
+  reading: string,
+  reference: string,
+  classical: string
 ): Promise<VerificationReport> {
+  const sources = sourcesBlock(
+    reference,
+    classical,
+    "the composer was given this; tender, sourced language drawn from it is legitimate — only flag a NAMED placement (sign, house, aspect, dignity, lot, star) that is absent from the chart frame or dossier"
+  );
   const msg = await client().messages.create({
     model: MODELS.verification,
     max_tokens: 1024,
@@ -380,6 +606,7 @@ async function runVerification(
           `CHART FRAME\n\`\`\`\n${brief}\n\`\`\`\n\n` +
           `DOSSIER THEMES: ${dossier.primary_themes.join(" · ")}\n` +
           `SUPPRESSED: ${dossier.suppressed_techniques.join("; ") || "none"}\n\n` +
+          sources +
           `DRAFT READING\n\`\`\`\n${reading}\n\`\`\`\n\nAudit it now.`,
       },
     ],
@@ -401,11 +628,18 @@ async function runRevision(
   brief: string,
   dossier: JudgmentDossier,
   reading: string,
-  issues: string[]
+  issues: string[],
+  reference: string,
+  classical: string
 ): Promise<string> {
+  const sources = sourcesBlock(
+    reference,
+    classical,
+    "preserve this depth as you revise; synthesize, never quote or list, never introduce a factor not in the frame"
+  );
   const stream = client().messages.stream({
     model: MODELS.composition, // a rewrite of the reading — stays at composition grade
-    max_tokens: 4096,
+    max_tokens: COMPOSITION_MAX_TOKENS,
     system: REVISE_SYSTEM,
     messages: [
       {
@@ -414,6 +648,7 @@ async function runRevision(
           `SUBJECT\n${subjectLine(args)}\n\n` +
           `CHART FRAME\n\`\`\`\n${brief}\n\`\`\`\n\n` +
           `DOSSIER\n\`\`\`\n${dossierToText(dossier)}\n\`\`\`\n\n` +
+          sources +
           `ISSUES TO FIX\n- ${issues.join("\n- ")}\n\n` +
           `CURRENT DRAFT\n\`\`\`\n${reading}\n\`\`\`\n\nReturn the corrected reading.`,
       },
@@ -499,8 +734,15 @@ function codesToText(codes: KnowledgeDocument[]): string {
 async function runEthicsReview(
   args: PipelineArgs,
   reading: string,
-  codes: KnowledgeDocument[]
+  codes: KnowledgeDocument[],
+  reference: string,
+  classical: string
 ): Promise<{ review: EthicsReview; adjustments: string[] }> {
+  const sources = sourcesBlock(
+    reference,
+    classical,
+    "the reading's interpretive claims are grounded in this cited corpus and these public-domain passages — weigh that when judging whether any statement is unsupported, unqualified, or overreaching"
+  );
   const msg = await client().messages.create({
     model: MODELS.ethics,
     max_tokens: 1536,
@@ -513,6 +755,7 @@ async function runEthicsReview(
         content:
           `SUBJECT\n${subjectLine(args)}\n\n` +
           `CODE(S) OF ETHICS (authoritative — audit against these)\n\`\`\`\n${codesToText(codes)}\n\`\`\`\n\n` +
+          sources +
           `DRAFT READING\n\`\`\`\n${reading}\n\`\`\`\n\nAudit it against the code(s) now.`,
       },
     ],
@@ -555,15 +798,22 @@ async function runEthicsRevision(
   dossier: JudgmentDossier,
   reading: string,
   adjustments: string[],
-  ethicalCovenant: string
+  ethicalCovenant: string,
+  reference: string,
+  classical: string
 ): Promise<string> {
   const system = `${COMPOSITION_SYSTEM}${covenantBlock(ethicalCovenant)}
 
 You are revising an existing draft to resolve specific ETHICAL alignment notes from the practice's ethics steward. Apply each adjustment with a light hand: preserve the voice, the structure, and every accurate placement. Change only tone, framing, qualifiers, and care — never the astrology, and never introduce a placement not already present. Return the full corrected reading in Markdown, nothing else.`;
 
+  const sources = sourcesBlock(
+    reference,
+    classical,
+    "preserve this depth as you revise; synthesize, never quote or list, never introduce a factor not in the frame"
+  );
   const stream = client().messages.stream({
     model: MODELS.composition, // an ethics rewrite of the reading — stays at composition grade
-    max_tokens: 4608,
+    max_tokens: COMPOSITION_MAX_TOKENS,
     system,
     messages: [
       {
@@ -572,6 +822,7 @@ You are revising an existing draft to resolve specific ETHICAL alignment notes f
           `SUBJECT\n${subjectLine(args)}\n\n` +
           `CHART FRAME (for exact placements you may name)\n\`\`\`\n${brief}\n\`\`\`\n\n` +
           `DOSSIER\n\`\`\`\n${dossierToText(dossier)}\n\`\`\`\n\n` +
+          sources +
           `ETHICAL ADJUSTMENTS TO APPLY\n- ${adjustments.join("\n- ")}\n\n` +
           `CURRENT DRAFT\n\`\`\`\n${reading}\n\`\`\`\n\nReturn the ethically aligned reading.`,
       },
@@ -645,8 +896,15 @@ async function runStudyNotes(
   args: PipelineArgs,
   brief: string,
   dossier: JudgmentDossier,
-  reading: string
+  reading: string,
+  reference: string,
+  classical: string
 ): Promise<StudyNotes> {
+  const sources = sourcesBlock(
+    reference,
+    classical,
+    "the delineations and public-domain passages actually consulted for this chart — cite them in your refs where your notes lean on them"
+  );
   const msg = await client().messages.create({
     model: MODELS.studyNotes,
     max_tokens: 2048,
@@ -660,6 +918,7 @@ async function runStudyNotes(
           `SUBJECT\n${subjectLine(args)}\n\n` +
           `CHART FRAME (authoritative)\n\`\`\`\n${brief}\n\`\`\`\n\n` +
           `EVIDENCE DOSSIER\n\`\`\`\n${dossierToText(dossier)}\n\`\`\`\n\n` +
+          sources +
           `THE FINISHED READING\n\`\`\`\n${reading}\n\`\`\`\n\nWrite your study notes now.`,
       },
     ],
@@ -682,14 +941,21 @@ export async function runReadingPipeline(args: PipelineArgs): Promise<PipelineRe
 
   // When a nativity was supplied, append the natal context: the birth chart's
   // own testimony, the length-of-life doctrine (descriptive), and the
-  // death-moment cross-aspects.
+  // death-moment cross-aspects. Also retrieve the natal-framed delineations for
+  // the nativity's identity factors — the material for the Tier-2 sections.
   const hasNatal = !!args.natalChart && !!args.birthDate;
+  let natalReference = "";
   if (hasNatal) {
     const natal = args.natalChart!;
     const natalAnalysis = computeChartAnalysis(natal);
     const lifespan = computeLifespan(natal, args.birthDate!, args.dateOfDeath);
     const cross = computeCrossAspects(natal, args.chart);
     brief += "\n\n" + natalContextToText(natal, natalAnalysis, lifespan, cross);
+    try {
+      natalReference = natalBrief(await selectNatalDelineations(natal, natalAnalysis));
+    } catch (err) {
+      console.error("[pipeline] natal delineation retrieval failed, composing without it:", err);
+    }
   }
 
   // Load the Code(s) of Ethics the reading aligns against. Loaded as data (with
@@ -697,18 +963,62 @@ export async function runReadingPipeline(args: PipelineArgs): Promise<PipelineRe
   const ethicsCodes = await getCodesOfEthics();
   const covenant = operatingSummary(ethicsCodes);
 
+  // Retrieve the interpretive reference ONCE: the delineations and the verbatim
+  // public-domain passages for the factors present in this chart. Threaded into
+  // EVERY pass that benefits — judgment, composition, the two rewrites,
+  // verification, study notes — so the whole bundled output the frontend
+  // receives is built on the same sourced corpus, not just the raw brief. Keyed
+  // off the same deterministic analysis, loaded through the knowledge seam
+  // (Supabase override, bundled fallback), and degrades to nothing on failure.
+  let reference = "";
+  let classical = "";
+  try {
+    const delineations = await selectDelineations(args.chart, analysis);
+    reference = delineationBrief(delineations);
+  } catch (err) {
+    console.error("[pipeline] delineation retrieval failed, composing without it:", err);
+  }
+  // Fold the natal-framed delineations into the same reference, clearly labeled,
+  // so they reach every pass that reads `reference` (composition + rewrites) as
+  // the material for the Tier-2 "The Life That Was" section.
+  if (natalReference.trim()) {
+    reference +=
+      (reference.trim() ? "\n\n" : "") +
+      `### The Life That Was — natal delineations (who this soul was, for the Tier-2 sections)\n${natalReference}`;
+  }
+  try {
+    const passages = await selectClassicalPassages(args.chart, analysis);
+    classical = classicalBrief(passages);
+  } catch (err) {
+    console.error("[pipeline] classical-passage retrieval failed, composing without it:", err);
+  }
+
   // Pass A — Judgment. If it fails, the composer still gets the raw brief.
   let dossier: JudgmentDossier | null = null;
   try {
-    dossier = await runJudgment(args, brief);
+    dossier = await runJudgment(args, brief, reference, classical);
   } catch (err) {
     console.error("[pipeline] judgment pass failed, composing from brief only:", err);
   }
 
-  // Pass B — Composition (born aligned via the ethical covenant).
+  // Pass S — Synthesis. Turn the dossier into an explicit reading plan (core
+  // themes + arc) the composer builds on, mirroring a practitioner's pre-session
+  // prep. Additive: a failure just means the composer works from the dossier.
   const composeDossier: JudgmentDossier =
     dossier ?? { primary_themes: [], factors: [], suppressed_techniques: [], limits: "" };
-  let reading = await runComposition(args, brief, composeDossier, hasNatal, covenant);
+  let plan = "";
+  try {
+    plan = readingPlanToText(
+      await runThemeSynthesis(args, brief, composeDossier, reference, classical)
+    );
+  } catch (err) {
+    console.error("[pipeline] synthesis pass failed, composing from the dossier alone:", err);
+  }
+
+  // Pass B — Composition (born aligned via the ethical covenant).
+  let reading = await runComposition(
+    args, brief, composeDossier, hasNatal, covenant, reference, classical, plan
+  );
 
   // Pass E — Ethical Alignment. Audits the finished prose against the full
   // code(s) and revises once if materially misaligned. Runs before Pass C so the
@@ -716,11 +1026,13 @@ export async function runReadingPipeline(args: PipelineArgs): Promise<PipelineRe
   let ethicsReview: EthicsReview | null = null;
   if (ethicsCodes.length) {
     try {
-      const { review, adjustments } = await runEthicsReview(args, reading, ethicsCodes);
+      const { review, adjustments } = await runEthicsReview(
+        args, reading, ethicsCodes, reference, classical
+      );
       ethicsReview = review; // keep the audit even if a later revision fails
       if (adjustments.length) {
         reading = await runEthicsRevision(
-          args, brief, composeDossier, reading, adjustments, covenant
+          args, brief, composeDossier, reading, adjustments, covenant, reference, classical
         );
         review.revised = true;
       }
@@ -732,9 +1044,11 @@ export async function runReadingPipeline(args: PipelineArgs): Promise<PipelineRe
   // Pass C — Verification (+ one revision if it fails). Never blocks delivery.
   let verification: VerificationReport | null = null;
   try {
-    verification = await runVerification(brief, composeDossier, reading);
+    verification = await runVerification(brief, composeDossier, reading, reference, classical);
     if (!verification.approved && verification.issues.length) {
-      reading = await runRevision(args, brief, composeDossier, reading, verification.issues);
+      reading = await runRevision(
+        args, brief, composeDossier, reading, verification.issues, reference, classical
+      );
     }
   } catch (err) {
     console.error("[pipeline] verification pass failed, delivering draft as-is:", err);
@@ -744,7 +1058,7 @@ export async function runReadingPipeline(args: PipelineArgs): Promise<PipelineRe
   // additive; a failure just means no notebook this time.
   let studyNotes: StudyNotes | null = null;
   try {
-    studyNotes = await runStudyNotes(args, brief, composeDossier, reading);
+    studyNotes = await runStudyNotes(args, brief, composeDossier, reading, reference, classical);
   } catch (err) {
     console.error("[pipeline] study-notes pass failed, delivering without notes:", err);
   }

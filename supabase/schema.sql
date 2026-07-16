@@ -33,8 +33,9 @@ create index if not exists readings_created_at_idx
   on public.readings (created_at desc);
 
 -- ── Migration for existing databases ─────────────────────────
--- If your `readings` table predates the three-pass pipeline, add the
--- dossier and natal_chart columns (safe to run repeatedly):
+-- If your `readings` table predates the multi-pass pipeline, add the
+-- dossier, natal_chart, ethics_review, and study_notes columns (safe to run
+-- repeatedly):
 alter table public.readings add column if not exists dossier jsonb;
 alter table public.readings add column if not exists natal_chart jsonb;
 alter table public.readings add column if not exists ethics_review jsonb;
@@ -44,10 +45,18 @@ alter table public.readings add column if not exists study_notes jsonb;
 -- Knowledge corpus
 -- A general, versioned store of the practice's compiled reference material —
 -- the proprietary compilation of public data the reading engine draws on. The
--- Code of Ethics is the first `kind`; later phases add more kinds (association
--- standards, articles, webinar transcripts, published readings, case data) as
--- new ROWS, with no schema change. Kind-specific extras live in `metadata`, so
--- new kinds never force a migration.
+-- Code of Ethics is the first `kind` and the interpretive `delineation` corpus
+-- the second (its factor-keyed entries ride in `metadata.entries`); later phases
+-- add more kinds (association standards, articles, webinar transcripts,
+-- published readings, case data) as new ROWS, with no schema change.
+-- Kind-specific extras live in `metadata`, so new kinds never force a migration.
+--
+-- All bundled kinds fall back gracefully, so seeding here is optional — it just
+-- makes the corpus editable in the DB without a redeploy. Row shapes mirror the
+-- bundled documents:
+--   • kind = 'delineation'      → metadata '{"entries":  [{"key":"moon:Scorpio","family":"moon", …}]}'
+--   • kind = 'classical_source' → metadata '{"passages": [{"key":"significator:Saturn","work":"…","ref":"…","text":"…"}]}'
+--                                  (verbatim public-domain excerpts) OR a bibliography row with no passages.
 -- ─────────────────────────────────────────────────────────────
 
 create table if not exists public.knowledge_documents (
