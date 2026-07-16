@@ -180,8 +180,10 @@ export interface DelineationEntry {
     | "modality"
     | "shape"
     | "significator"
+    | "ruler"
     | "dignity"
     | "aspect"
+    | "pattern"
     | "house"
     | "lot"
     | "star";

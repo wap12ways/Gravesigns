@@ -175,6 +175,28 @@ export function activeFactorKeys(chart: DeathChart, analysis: ChartAnalysis): Se
   // The lunar nodes ride the chart's planet list under various labels.
   if (chart.planets.some((p) => /node/i.test(p.name))) keys.add("significator:Nodes");
 
+  // The Ruling Hand: the governor of the chart — the almuten of the Ascendant
+  // degree (present only when angles are known). One classical planet.
+  if (analysis.ascendantAlmuten?.planet) {
+    keys.add(`ruler:${analysis.ascendantAlmuten.planet}`);
+  }
+
+  // Aspect patterns detected across the bodies (stellium, T-square, …).
+  for (const pat of analysis.patterns) keys.add(`pattern:${pat.type}`);
+
+  // Benefic soft contacts (trine/sextile) from Jupiter/Venus to a luminary —
+  // read straight from the computed aspect list.
+  const SOFT = new Set(["Trine", "Sextile"]);
+  const LUMINARIES = new Set(["Sun", "Moon"]);
+  for (const a of chart.aspects) {
+    if (!SOFT.has(a.type)) continue;
+    for (const benefic of ["Jupiter", "Venus"] as const) {
+      const touchesBenefic = a.a === benefic || a.b === benefic;
+      const other = a.a === benefic ? a.b : a.a;
+      if (touchesBenefic && LUMINARIES.has(other)) keys.add(`aspect:${benefic}-soft`);
+    }
+  }
+
   // Planetary condition (dignity), read only for the bodies that carry a death
   // chart — the luminaries and the mortal significators — and only for the
   // notable conditions, so the reference stays meaningful rather than noisy.
@@ -218,17 +240,19 @@ export function activeFactorKeys(chart: DeathChart, analysis: ChartAnalysis): Se
 const FAMILY_RANK: Record<DelineationEntry["family"], number> = {
   moon: 0,
   phase: 1,
-  significator: 2,
-  dignity: 3,
-  aspect: 4,
-  house: 5,
-  lot: 6,
-  star: 7,
-  shape: 8,
-  sun: 9,
-  element: 10,
-  modality: 11,
-  sect: 12,
+  ruler: 2,
+  significator: 3,
+  dignity: 4,
+  aspect: 5,
+  pattern: 6,
+  house: 7,
+  lot: 8,
+  star: 9,
+  shape: 10,
+  sun: 11,
+  element: 12,
+  modality: 13,
+  sect: 14,
 };
 
 /**
@@ -242,7 +266,7 @@ export async function selectDelineations(
   analysis: ChartAnalysis,
   opts: { limit?: number } = {}
 ): Promise<DelineationEntry[]> {
-  const limit = opts.limit ?? 22;
+  const limit = opts.limit ?? 26;
   const docs = await getDelineations();
   const all = delineationEntries(docs);
   if (!all.length) return [];
@@ -271,9 +295,11 @@ export function delineationBrief(entries: DelineationEntry[]): string {
   const FAMILY_HEADING: Record<DelineationEntry["family"], string> = {
     moon: "The Soul's Vehicle — the Moon",
     phase: "The Lunar Phase",
+    ruler: "The Ruling Hand",
     significator: "The Mortal Significators & Karmic Axis",
     dignity: "Planetary Condition (Dignity)",
-    aspect: "Hard Contacts",
+    aspect: "Aspect Contacts",
+    pattern: "Aspect Patterns",
     house: "The Death-House Complex (8th · 4th · 12th)",
     lot: "The Lots",
     star: "Fixed-Star Contacts",
