@@ -144,6 +144,9 @@ export type KnowledgeKind =
   // draws on for depth (Moon-by-sign, the mortal significators, the death
   // houses, the Lots, the fixed stars). Entries ride in `metadata.entries`.
   | "delineation"
+  // A vetted bibliography of PUBLIC-DOMAIN classical sources — the legal-path
+  // corpus the practice may ingest and store, with per-work rights status.
+  | "classical_source"
   // Reserved for later phases — listed so the type never has to be widened in a
   // breaking way. Consumers should treat KnowledgeKind as open-ended.
   | "association_standard"
@@ -177,6 +180,8 @@ export interface DelineationEntry {
     | "modality"
     | "shape"
     | "significator"
+    | "dignity"
+    | "aspect"
     | "house"
     | "lot"
     | "star";

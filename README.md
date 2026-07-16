@@ -103,7 +103,8 @@ src/
     │   ├── index.ts               # loadKnowledge() + selectDelineations() — Supabase w/ bundled fallback
     │   └── documents/
     │       ├── ncgr-code-of-ethics.ts   # bundled, verbatim NCGR code
-    │       └── death-delineations.ts    # factor-keyed interpretive corpus (Moon-by-sign, significators, …)
+    │       ├── death-delineations.ts    # factor-keyed interpretive corpus (Moon-by-sign, significators, …)
+    │       └── classical-sources.ts     # legal-path bibliography (public-domain vs. doctrine-only)
     ├── glyphs.ts                  # shared glyphs + element palette
     ├── supabase.ts                # persistence (graceful demo fallback)
     ├── markdown.ts                # tiny, safe MD → HTML
@@ -200,6 +201,29 @@ code, can be **overridden or extended from Supabase** by adding
 holds more `{key, family, title, body, source}` entries — no code change. That
 is also the seam through which larger sources (public-domain classical texts,
 association standards) would be ingested and stored.
+
+The corpus covers, by family: the Moon and Sun by sign, the lunar phase, the
+sect, the elemental and modal cast, the chart shape, the mortal significators and
+the karmic axis, **planetary condition (dignity)**, **hard malefic contacts**,
+the 8th/4th/12th complex, the Lots, and the death-salient fixed stars — ~78
+entries. The retrieval derives dignity and hard-contact keys only for the
+luminaries and mortal significators, so those layers stay meaningful rather than
+noisy.
+
+### Legal-path sourcing policy
+
+The corpus is grown on the **legal path only**: original writing plus
+**public-domain** primary sources — no commercially licensed modern text is
+stored. A third corpus kind, **`classical_source`**
+([`classical-sources.ts`](src/lib/knowledge/documents/classical-sources.ts)), is
+a vetted bibliography that records exactly which works may be ingested verbatim
+(e.g. Ptolemy's _Tetrabiblos_ in Ashmand's 1822 translation, Lilly's 1647
+_Christian Astrology_, Alan Leo, Sepharial) versus which are **doctrine-only** —
+ancient texts whose sole modern English translations remain under copyright
+(Valens, Dorotheus, Firmicus, Bonatti), to be cited as study references but never
+copied. It carries a per-work rights note and an ingestion policy for the future
+full-text corpus. (Rights hygiene, not legal advice — confirm any edition before
+storing it.)
 
 ## ✦ Deploy to Vercel
 

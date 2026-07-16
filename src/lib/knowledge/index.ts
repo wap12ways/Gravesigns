@@ -25,11 +25,13 @@ import type { ChartAnalysis } from "../analysis";
 import { getSupabase } from "../supabase";
 import { NCGR_CODE_OF_ETHICS } from "./documents/ncgr-code-of-ethics";
 import { DEATH_DELINEATIONS_DOC } from "./documents/death-delineations";
+import { CLASSICAL_SOURCES_DOC } from "./documents/classical-sources";
 
 /** Everything compiled into the app. New bundled documents are added here. */
 export const BUNDLED_DOCUMENTS: KnowledgeDocument[] = [
   NCGR_CODE_OF_ETHICS,
   DEATH_DELINEATIONS_DOC,
+  CLASSICAL_SOURCES_DOC,
 ];
 
 function bundledByKind(kind: KnowledgeKind): KnowledgeDocument[] {
@@ -173,6 +175,33 @@ export function activeFactorKeys(chart: DeathChart, analysis: ChartAnalysis): Se
   // The lunar nodes ride the chart's planet list under various labels.
   if (chart.planets.some((p) => /node/i.test(p.name))) keys.add("significator:Nodes");
 
+  // Planetary condition (dignity), read only for the bodies that carry a death
+  // chart — the luminaries and the mortal significators — and only for the
+  // notable conditions, so the reference stays meaningful rather than noisy.
+  const CONDITION_BODIES = new Set([
+    "Sun",
+    "Moon",
+    "Saturn",
+    "Mars",
+    "Pluto",
+  ]);
+  for (const d of analysis.dignities) {
+    if (!CONDITION_BODIES.has(d.planet)) continue;
+    const e = d.essential;
+    if (e.domicile) keys.add("dignity:domicile");
+    if (e.exaltation) keys.add("dignity:exaltation");
+    if (e.detriment) keys.add("dignity:detriment");
+    if (e.fall) keys.add("dignity:fall");
+    if (e.peregrine) keys.add("dignity:peregrine");
+  }
+
+  // Hard contacts from the malefics to a luminary or angle — surfaced per malefic.
+  for (const c of analysis.death.maleficContacts) {
+    if (c.malefic === "Saturn" || c.malefic === "Mars" || c.malefic === "Pluto") {
+      keys.add(`aspect:${c.malefic}-hard`);
+    }
+  }
+
   for (const h of analysis.death.houses) keys.add(`house:${h.house}`);
 
   for (const lot of analysis.lots) {
@@ -190,14 +219,16 @@ const FAMILY_RANK: Record<DelineationEntry["family"], number> = {
   moon: 0,
   phase: 1,
   significator: 2,
-  house: 3,
-  lot: 4,
-  star: 5,
-  shape: 6,
-  sun: 7,
-  element: 8,
-  modality: 9,
-  sect: 10,
+  dignity: 3,
+  aspect: 4,
+  house: 5,
+  lot: 6,
+  star: 7,
+  shape: 8,
+  sun: 9,
+  element: 10,
+  modality: 11,
+  sect: 12,
 };
 
 /**
@@ -211,7 +242,7 @@ export async function selectDelineations(
   analysis: ChartAnalysis,
   opts: { limit?: number } = {}
 ): Promise<DelineationEntry[]> {
-  const limit = opts.limit ?? 18;
+  const limit = opts.limit ?? 22;
   const docs = await getDelineations();
   const all = delineationEntries(docs);
   if (!all.length) return [];
@@ -241,6 +272,8 @@ export function delineationBrief(entries: DelineationEntry[]): string {
     moon: "The Soul's Vehicle — the Moon",
     phase: "The Lunar Phase",
     significator: "The Mortal Significators & Karmic Axis",
+    dignity: "Planetary Condition (Dignity)",
+    aspect: "Hard Contacts",
     house: "The Death-House Complex (8th · 4th · 12th)",
     lot: "The Lots",
     star: "Fixed-Star Contacts",
