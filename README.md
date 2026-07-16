@@ -206,11 +206,16 @@ association standards) would be ingested and stored.
 
 The corpus covers, by family: the Moon and Sun by sign, the lunar phase, the
 sect, the elemental and modal cast, the chart shape, the mortal significators and
-the karmic axis, **planetary condition (dignity)**, **hard malefic contacts**,
-the 8th/4th/12th complex, the Lots, and the death-salient fixed stars — ~78
-entries. The retrieval derives dignity and hard-contact keys only for the
-luminaries and mortal significators, so those layers stay meaningful rather than
-noisy.
+the karmic axis, the **ruling hand** (chart ruler / almuten), **planetary
+condition (dignity)**, aspect **contacts** (hard malefic / soft benefic) and
+**patterns** (stellium, T-square, grand trine, yod), the **significators
+tenanting the death houses** (a body in the 8th/4th/12th — the most direct death
+testimony), the specific **luminary–malefic contacts** (Moon–Saturn, Sun–Pluto,
+…), **chart conditions** (a retrograde significator, an anaretic or cusp degree),
+the 8th/4th/12th complex, the Lots, and the death-salient fixed stars — **~115
+entries**. The retrieval derives the condition-sensitive keys (dignity, contacts,
+occupancy) only for the luminaries and mortal significators, so those layers stay
+meaningful rather than noisy.
 
 ### Legal-path sourcing policy
 
