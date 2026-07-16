@@ -16,6 +16,7 @@
  * treat the DB as the editable source of truth without ever risking a reading.
  */
 import type {
+  ClassicalPassage,
   DelineationEntry,
   DeathChart,
   KnowledgeDocument,
@@ -26,12 +27,14 @@ import { getSupabase } from "../supabase";
 import { NCGR_CODE_OF_ETHICS } from "./documents/ncgr-code-of-ethics";
 import { DEATH_DELINEATIONS_DOC } from "./documents/death-delineations";
 import { CLASSICAL_SOURCES_DOC } from "./documents/classical-sources";
+import { CLASSICAL_PASSAGES_DOC } from "./documents/classical-passages";
 
 /** Everything compiled into the app. New bundled documents are added here. */
 export const BUNDLED_DOCUMENTS: KnowledgeDocument[] = [
   NCGR_CODE_OF_ETHICS,
   DEATH_DELINEATIONS_DOC,
   CLASSICAL_SOURCES_DOC,
+  CLASSICAL_PASSAGES_DOC,
 ];
 
 function bundledByKind(kind: KnowledgeKind): KnowledgeDocument[] {
@@ -329,4 +332,74 @@ export function delineationBrief(entries: DelineationEntry[]): string {
     }
   }
   return blocks.join("\n");
+}
+
+// ── Classical passages: retrieval ───────────────────────────────────────────
+// Verbatim public-domain excerpts (kind `classical_source`, carried in
+// `metadata.passages`), retrieved by the same factor keys as the delineations
+// and folded into composition as a secondary reference — the tradition in its
+// own words, alongside the practice's original delineations.
+
+/** Load the active classical-source documents (Supabase override, bundled). */
+export function getClassicalSources(): Promise<KnowledgeDocument[]> {
+  return loadKnowledge("classical_source");
+}
+
+/** Flatten the `metadata.passages` of a set of classical-source documents. */
+export function classicalPassages(docs: KnowledgeDocument[]): ClassicalPassage[] {
+  const out: ClassicalPassage[] = [];
+  for (const d of docs) {
+    const passages = d.metadata?.passages;
+    if (Array.isArray(passages)) {
+      for (const p of passages) {
+        if (
+          p &&
+          typeof p.key === "string" &&
+          typeof p.text === "string" &&
+          typeof p.work === "string"
+        ) {
+          out.push(p as ClassicalPassage);
+        }
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Select the public-domain passages whose key matches a factor in this chart,
+ * de-duplicated by key, ranked spine-first, and capped tight (these are a
+ * secondary reference, not the spine). Never throws.
+ */
+export async function selectClassicalPassages(
+  chart: DeathChart,
+  analysis: ChartAnalysis,
+  opts: { limit?: number } = {}
+): Promise<ClassicalPassage[]> {
+  const limit = opts.limit ?? 4;
+  const docs = await getClassicalSources();
+  const all = classicalPassages(docs);
+  if (!all.length) return [];
+
+  const active = activeFactorKeys(chart, analysis);
+  const seen = new Set<string>();
+  const matched = all.filter((p) => {
+    if (!active.has(p.key) || seen.has(p.key)) return false;
+    seen.add(p.key);
+    return true;
+  });
+
+  const famOf = (key: string) => key.split(":")[0] as DelineationEntry["family"];
+  matched.sort(
+    (a, b) => (FAMILY_RANK[famOf(a.key)] ?? 99) - (FAMILY_RANK[famOf(b.key)] ?? 99)
+  );
+  return matched.slice(0, limit);
+}
+
+/** Render selected passages into the compact classical-reference block. */
+export function classicalBrief(passages: ClassicalPassage[]): string {
+  if (!passages.length) return "";
+  return passages
+    .map((p) => `- "${p.text}" — ${p.work}, ${p.ref}`)
+    .join("\n");
 }

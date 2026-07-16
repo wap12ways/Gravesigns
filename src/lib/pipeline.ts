@@ -42,6 +42,8 @@ import {
   codeLabel,
   selectDelineations,
   delineationBrief,
+  selectClassicalPassages,
+  classicalBrief,
 } from "./knowledge";
 
 /**
@@ -332,10 +334,14 @@ async function runComposition(
   dossier: JudgmentDossier,
   hasNatal: boolean,
   ethicalCovenant: string,
-  reference: string
+  reference: string,
+  classical: string
 ): Promise<string> {
   const referenceBlock = reference.trim()
     ? `INTERPRETIVE REFERENCE (traditional delineations for the factors present in this chart — synthesize for depth, never quote or list, never introduce a factor not in the frame)\n\`\`\`\n${reference.trim()}\n\`\`\`\n\n`
+    : "";
+  const classicalBlock = classical.trim()
+    ? `PRIMARY SOURCES (verbatim public-domain passages on the temperament of these bodies — let their sense inform the grain of the prose; you may echo a phrase sparingly, but do not quote at length, and never import from them any claim of a cause or manner of death)\n\`\`\`\n${classical.trim()}\n\`\`\`\n\n`
     : "";
   const stream = client().messages.stream({
     model: MODELS.composition,
@@ -352,6 +358,7 @@ async function runComposition(
           `JUDGMENT DOSSIER (compose from this — it is authoritative)\n\`\`\`\n${dossierToText(dossier)}\n\`\`\`\n\n` +
           `CHART FRAME (for exact placements you may name)\n\`\`\`\n${brief}\n\`\`\`\n\n` +
           referenceBlock +
+          classicalBlock +
           `Compose the reading now.`,
       },
     ],
@@ -731,11 +738,18 @@ export async function runReadingPipeline(args: PipelineArgs): Promise<PipelineRe
   // Keyed off the same deterministic analysis, loaded through the knowledge seam
   // (Supabase override, bundled fallback), and degrades to nothing on failure.
   let reference = "";
+  let classical = "";
   try {
     const delineations = await selectDelineations(args.chart, analysis);
     reference = delineationBrief(delineations);
   } catch (err) {
     console.error("[pipeline] delineation retrieval failed, composing without it:", err);
+  }
+  try {
+    const passages = await selectClassicalPassages(args.chart, analysis);
+    classical = classicalBrief(passages);
+  } catch (err) {
+    console.error("[pipeline] classical-passage retrieval failed, composing without it:", err);
   }
 
   // Pass A — Judgment. If it fails, the composer still gets the raw brief.
@@ -749,7 +763,7 @@ export async function runReadingPipeline(args: PipelineArgs): Promise<PipelineRe
   // Pass B — Composition (born aligned via the ethical covenant).
   const composeDossier: JudgmentDossier =
     dossier ?? { primary_themes: [], factors: [], suppressed_techniques: [], limits: "" };
-  let reading = await runComposition(args, brief, composeDossier, hasNatal, covenant, reference);
+  let reading = await runComposition(args, brief, composeDossier, hasNatal, covenant, reference, classical);
 
   // Pass E — Ethical Alignment. Audits the finished prose against the full
   // code(s) and revises once if materially misaligned. Runs before Pass C so the

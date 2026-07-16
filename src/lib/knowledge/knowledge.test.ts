@@ -16,8 +16,13 @@ import {
   delineationBrief,
   delineationEntries,
   getDelineations,
+  selectClassicalPassages,
+  classicalBrief,
+  classicalPassages,
+  getClassicalSources,
 } from "./index";
 import { DEATH_DELINEATIONS } from "./documents/death-delineations";
+import { CLASSICAL_PASSAGES } from "./documents/classical-passages";
 
 // The families the retrieval can emit and the corpus is expected to cover.
 const COVERED_FAMILIES: DelineationEntry["family"][] = [
@@ -255,5 +260,59 @@ describe("bundled corpus wiring", () => {
   it("loads delineation entries through the knowledge seam (bundled fallback)", async () => {
     const entries = delineationEntries(await getDelineations());
     expect(entries.length).toBe(DEATH_DELINEATIONS.length);
+  });
+});
+
+describe("classical passages (public-domain primary sources)", () => {
+  it("every passage is well-formed and carries a work + citation", () => {
+    expect(CLASSICAL_PASSAGES.length).toBeGreaterThan(0);
+    for (const p of CLASSICAL_PASSAGES) {
+      expect(p.key).toMatch(/^[a-z]+:.+/);
+      expect(p.text.trim().length, p.key).toBeGreaterThan(30);
+      expect(p.work.trim().length, p.key).toBeGreaterThan(0);
+      expect(p.ref.trim().length, p.key).toBeGreaterThan(0);
+    }
+  });
+
+  it("carries no cause-/manner-of-death content (integrity policy)", () => {
+    // Temperament passages only: the duration/kind-of-death chapters are excluded
+    // by policy, so no ingested passage may name a disease or manner of death.
+    const forbidden = /\b(disease|death|dies|die|dying|killed?|fever|wound|apoplexy|dropsy|quinsey|hæmorrhage|hemorrhage|abortion|childbirth|lingering)\b/i;
+    for (const p of CLASSICAL_PASSAGES) {
+      expect(forbidden.test(p.text), `forbidden death-content in passage ${p.key}: "${p.text}"`).toBe(false);
+    }
+  });
+
+  it("loads through the knowledge seam and every passage key is a real factor key", async () => {
+    const passages = classicalPassages(await getClassicalSources());
+    expect(passages.length).toBe(CLASSICAL_PASSAGES.length);
+    // Each passage key must be something the retrieval can actually emit. Union a
+    // day and a night chart so both sect keys are reachable (a chart is one sect).
+    const analysis = makeAnalysis();
+    const nightKeys = activeFactorKeys(makeChart({ sect: "night" }), analysis);
+    const dayKeys = activeFactorKeys(makeChart({ sect: "day" }), analysis);
+    const emittable = new Set([...nightKeys, ...dayKeys]);
+    for (const p of CLASSICAL_PASSAGES) {
+      expect(emittable.has(p.key), `passage key never emittable: ${p.key}`).toBe(true);
+    }
+  });
+
+  it("selectClassicalPassages returns only active passages, capped and spine-first", async () => {
+    const sel = await selectClassicalPassages(makeChart(), makeAnalysis(), { limit: 3 });
+    expect(sel.length).toBeLessThanOrEqual(3);
+    const active = activeFactorKeys(makeChart(), makeAnalysis());
+    for (const p of sel) expect(active.has(p.key)).toBe(true);
+    const keys = sel.map((p) => p.key);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it("classicalBrief renders each passage verbatim with its citation", async () => {
+    const sel = await selectClassicalPassages(makeChart(), makeAnalysis());
+    const brief = classicalBrief(sel);
+    if (sel.length) {
+      expect(brief).toContain(sel[0].text);
+      expect(brief).toContain(sel[0].work);
+    }
+    expect(classicalBrief([])).toBe("");
   });
 });

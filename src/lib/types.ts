@@ -233,6 +233,25 @@ export interface KnowledgeSection {
 }
 
 /**
+ * One verbatim excerpt from a PUBLIC-DOMAIN primary source (kind
+ * `classical_source`, carried in `metadata.passages`). Retrieved by the same
+ * factor keys as the delineations and folded into the composition pass as a
+ * secondary reference — the tradition in its own words. Only temperament /
+ * nature passages are stored; anything asserting a cause or manner of death is
+ * deliberately excluded, as the practice never reads for cause or manner.
+ */
+export interface ClassicalPassage {
+  /** Factor key, same scheme as delineations, e.g. "significator:Saturn". */
+  key: string;
+  /** The work, e.g. "Ptolemy, Tetrabiblos". */
+  work: string;
+  /** The citation, e.g. "Book I, ch. 4 (Ashmand trans., 1822; public domain)". */
+  ref: string;
+  /** The verbatim excerpt (typography normalized; wording unchanged). */
+  text: string;
+}
+
+/**
  * The output of Pass E (Ethical Alignment): a transparent record of how the
  * drafted reading measured against the loaded Code(s) of Ethics, and what — if
  * anything — was adjusted to bring it into alignment.
