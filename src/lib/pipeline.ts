@@ -191,7 +191,17 @@ const JUDGMENT_TOOL: Anthropic.Tool = {
   },
 };
 
-async function runJudgment(args: PipelineArgs, brief: string): Promise<JudgmentDossier> {
+async function runJudgment(
+  args: PipelineArgs,
+  brief: string,
+  reference: string,
+  classical: string
+): Promise<JudgmentDossier> {
+  const sources = sourcesBlock(
+    reference,
+    classical,
+    "weigh the brief's factors with this doctrine in mind — let it inform the direction and weight you assign; never let it introduce a placement not in the brief"
+  );
   const msg = await client().messages.create({
     model: MODELS.judgment,
     max_tokens: 4096,
@@ -201,7 +211,11 @@ async function runJudgment(args: PipelineArgs, brief: string): Promise<JudgmentD
     messages: [
       {
         role: "user",
-        content: `SUBJECT\n${subjectLine(args)}\n\nEVIDENCE BRIEF (pre-computed — every number is authoritative)\n\`\`\`\n${brief}\n\`\`\`\n\nProduce the judgment dossier now.`,
+        content:
+          `SUBJECT\n${subjectLine(args)}\n\n` +
+          `EVIDENCE BRIEF (pre-computed — every number is authoritative)\n\`\`\`\n${brief}\n\`\`\`\n\n` +
+          sources +
+          `Produce the judgment dossier now.`,
       },
     ],
   });
@@ -340,6 +354,30 @@ function covenantBlock(ethicalCovenant: string): string {
   return `\n\nETHICAL COVENANT (you write within these professional standards)\n${ethicalCovenant.trim()}`;
 }
 
+/**
+ * The retrieved reference material — the interpretive delineations and the
+ * verbatim public-domain passages for the factors present in this chart — framed
+ * for whichever pass consumes it. Folded into EVERY pass that benefits (judgment,
+ * composition, the two rewrites, verification, study notes) so the whole bundled
+ * output the frontend receives is built on the same sourced corpus, not just the
+ * raw number-brief. Returns "" when nothing was retrieved, so callers can splice
+ * it in unconditionally.
+ */
+function sourcesBlock(reference: string, classical: string, guidance: string): string {
+  const parts: string[] = [];
+  if (reference.trim()) {
+    parts.push(
+      `INTERPRETIVE REFERENCE (traditional delineations for the factors present in this chart — ${guidance})\n\`\`\`\n${reference.trim()}\n\`\`\``
+    );
+  }
+  if (classical.trim()) {
+    parts.push(
+      `PRIMARY SOURCES (verbatim public-domain passages on the temperament of these bodies — the tradition in its own words; never a claim of a cause or manner of death)\n\`\`\`\n${classical.trim()}\n\`\`\``
+    );
+  }
+  return parts.length ? parts.join("\n\n") + "\n\n" : "";
+}
+
 async function runComposition(
   args: PipelineArgs,
   brief: string,
@@ -349,12 +387,11 @@ async function runComposition(
   reference: string,
   classical: string
 ): Promise<string> {
-  const referenceBlock = reference.trim()
-    ? `INTERPRETIVE REFERENCE (traditional delineations for the factors present in this chart — synthesize for depth, never quote or list, never introduce a factor not in the frame)\n\`\`\`\n${reference.trim()}\n\`\`\`\n\n`
-    : "";
-  const classicalBlock = classical.trim()
-    ? `PRIMARY SOURCES (verbatim public-domain passages on the temperament of these bodies — let their sense inform the grain of the prose; you may echo a phrase sparingly, but do not quote at length, and never import from them any claim of a cause or manner of death)\n\`\`\`\n${classical.trim()}\n\`\`\`\n\n`
-    : "";
+  const sources = sourcesBlock(
+    reference,
+    classical,
+    "synthesize for depth and texture; never quote or list them, and never introduce a factor not in the frame"
+  );
   const stream = client().messages.stream({
     model: MODELS.composition,
     max_tokens: COMPOSITION_MAX_TOKENS,
@@ -369,8 +406,7 @@ async function runComposition(
           `SUBJECT\n${subjectLine(args)}\n\n` +
           `JUDGMENT DOSSIER (compose from this — it is authoritative)\n\`\`\`\n${dossierToText(dossier)}\n\`\`\`\n\n` +
           `CHART FRAME (for exact placements you may name)\n\`\`\`\n${brief}\n\`\`\`\n\n` +
-          referenceBlock +
-          classicalBlock +
+          sources +
           `Compose the reading now.`,
       },
     ],
@@ -390,7 +426,7 @@ async function runComposition(
 const VERIFY_SYSTEM = `You are the reviewing astrologer of GraveSigns. You audit a drafted death-chart reading against the chart it was built from. You are strict about integrity and gentle about voice.
 
 Check for, in order:
-1. FABRICATION — any placement, sign, house, aspect, dignity, lot, or fixed star named in the reading that is NOT present in the chart frame or dossier. This is the gravest fault.
+1. FABRICATION — any placement, sign, house, aspect, dignity, lot, or fixed star named in the reading that is NOT present in the chart frame or dossier. This is the gravest fault. (The reading was also given an INTERPRETIVE REFERENCE and PRIMARY SOURCES; sourced interpretive language drawn from them is legitimate — judge fabrication only on named placements, not on traditional phrasing.)
 2. FORBIDDEN CLAIMS — any statement or clear implication of a cause of death, manner of death, a specific date, or a length/span of life. Also flag prediction of the future or medical/diagnostic language.
 3. TONE — anything cold, sensational, frightening, moralizing, or clichéd; anything unsafe to read in grief.
 4. STRUCTURE — missing required sections or a wildly wrong length.
@@ -413,8 +449,15 @@ const VERIFY_TOOL: Anthropic.Tool = {
 async function runVerification(
   brief: string,
   dossier: JudgmentDossier,
-  reading: string
+  reading: string,
+  reference: string,
+  classical: string
 ): Promise<VerificationReport> {
+  const sources = sourcesBlock(
+    reference,
+    classical,
+    "the composer was given this; tender, sourced language drawn from it is legitimate — only flag a NAMED placement (sign, house, aspect, dignity, lot, star) that is absent from the chart frame or dossier"
+  );
   const msg = await client().messages.create({
     model: MODELS.verification,
     max_tokens: 1024,
@@ -428,6 +471,7 @@ async function runVerification(
           `CHART FRAME\n\`\`\`\n${brief}\n\`\`\`\n\n` +
           `DOSSIER THEMES: ${dossier.primary_themes.join(" · ")}\n` +
           `SUPPRESSED: ${dossier.suppressed_techniques.join("; ") || "none"}\n\n` +
+          sources +
           `DRAFT READING\n\`\`\`\n${reading}\n\`\`\`\n\nAudit it now.`,
       },
     ],
@@ -449,8 +493,15 @@ async function runRevision(
   brief: string,
   dossier: JudgmentDossier,
   reading: string,
-  issues: string[]
+  issues: string[],
+  reference: string,
+  classical: string
 ): Promise<string> {
+  const sources = sourcesBlock(
+    reference,
+    classical,
+    "preserve this depth as you revise; synthesize, never quote or list, never introduce a factor not in the frame"
+  );
   const stream = client().messages.stream({
     model: MODELS.composition, // a rewrite of the reading — stays at composition grade
     max_tokens: COMPOSITION_MAX_TOKENS,
@@ -462,6 +513,7 @@ async function runRevision(
           `SUBJECT\n${subjectLine(args)}\n\n` +
           `CHART FRAME\n\`\`\`\n${brief}\n\`\`\`\n\n` +
           `DOSSIER\n\`\`\`\n${dossierToText(dossier)}\n\`\`\`\n\n` +
+          sources +
           `ISSUES TO FIX\n- ${issues.join("\n- ")}\n\n` +
           `CURRENT DRAFT\n\`\`\`\n${reading}\n\`\`\`\n\nReturn the corrected reading.`,
       },
@@ -547,8 +599,15 @@ function codesToText(codes: KnowledgeDocument[]): string {
 async function runEthicsReview(
   args: PipelineArgs,
   reading: string,
-  codes: KnowledgeDocument[]
+  codes: KnowledgeDocument[],
+  reference: string,
+  classical: string
 ): Promise<{ review: EthicsReview; adjustments: string[] }> {
+  const sources = sourcesBlock(
+    reference,
+    classical,
+    "the reading's interpretive claims are grounded in this cited corpus and these public-domain passages — weigh that when judging whether any statement is unsupported, unqualified, or overreaching"
+  );
   const msg = await client().messages.create({
     model: MODELS.ethics,
     max_tokens: 1536,
@@ -561,6 +620,7 @@ async function runEthicsReview(
         content:
           `SUBJECT\n${subjectLine(args)}\n\n` +
           `CODE(S) OF ETHICS (authoritative — audit against these)\n\`\`\`\n${codesToText(codes)}\n\`\`\`\n\n` +
+          sources +
           `DRAFT READING\n\`\`\`\n${reading}\n\`\`\`\n\nAudit it against the code(s) now.`,
       },
     ],
@@ -603,12 +663,19 @@ async function runEthicsRevision(
   dossier: JudgmentDossier,
   reading: string,
   adjustments: string[],
-  ethicalCovenant: string
+  ethicalCovenant: string,
+  reference: string,
+  classical: string
 ): Promise<string> {
   const system = `${COMPOSITION_SYSTEM}${covenantBlock(ethicalCovenant)}
 
 You are revising an existing draft to resolve specific ETHICAL alignment notes from the practice's ethics steward. Apply each adjustment with a light hand: preserve the voice, the structure, and every accurate placement. Change only tone, framing, qualifiers, and care — never the astrology, and never introduce a placement not already present. Return the full corrected reading in Markdown, nothing else.`;
 
+  const sources = sourcesBlock(
+    reference,
+    classical,
+    "preserve this depth as you revise; synthesize, never quote or list, never introduce a factor not in the frame"
+  );
   const stream = client().messages.stream({
     model: MODELS.composition, // an ethics rewrite of the reading — stays at composition grade
     max_tokens: COMPOSITION_MAX_TOKENS,
@@ -620,6 +687,7 @@ You are revising an existing draft to resolve specific ETHICAL alignment notes f
           `SUBJECT\n${subjectLine(args)}\n\n` +
           `CHART FRAME (for exact placements you may name)\n\`\`\`\n${brief}\n\`\`\`\n\n` +
           `DOSSIER\n\`\`\`\n${dossierToText(dossier)}\n\`\`\`\n\n` +
+          sources +
           `ETHICAL ADJUSTMENTS TO APPLY\n- ${adjustments.join("\n- ")}\n\n` +
           `CURRENT DRAFT\n\`\`\`\n${reading}\n\`\`\`\n\nReturn the ethically aligned reading.`,
       },
@@ -693,8 +761,15 @@ async function runStudyNotes(
   args: PipelineArgs,
   brief: string,
   dossier: JudgmentDossier,
-  reading: string
+  reading: string,
+  reference: string,
+  classical: string
 ): Promise<StudyNotes> {
+  const sources = sourcesBlock(
+    reference,
+    classical,
+    "the delineations and public-domain passages actually consulted for this chart — cite them in your refs where your notes lean on them"
+  );
   const msg = await client().messages.create({
     model: MODELS.studyNotes,
     max_tokens: 2048,
@@ -708,6 +783,7 @@ async function runStudyNotes(
           `SUBJECT\n${subjectLine(args)}\n\n` +
           `CHART FRAME (authoritative)\n\`\`\`\n${brief}\n\`\`\`\n\n` +
           `EVIDENCE DOSSIER\n\`\`\`\n${dossierToText(dossier)}\n\`\`\`\n\n` +
+          sources +
           `THE FINISHED READING\n\`\`\`\n${reading}\n\`\`\`\n\nWrite your study notes now.`,
       },
     ],
@@ -745,9 +821,12 @@ export async function runReadingPipeline(args: PipelineArgs): Promise<PipelineRe
   const ethicsCodes = await getCodesOfEthics();
   const covenant = operatingSummary(ethicsCodes);
 
-  // Retrieve the interpretive reference: the delineations for the factors
-  // actually present in this chart, folded into the composition pass for depth.
-  // Keyed off the same deterministic analysis, loaded through the knowledge seam
+  // Retrieve the interpretive reference ONCE: the delineations and the verbatim
+  // public-domain passages for the factors present in this chart. Threaded into
+  // EVERY pass that benefits — judgment, composition, the two rewrites,
+  // verification, study notes — so the whole bundled output the frontend
+  // receives is built on the same sourced corpus, not just the raw brief. Keyed
+  // off the same deterministic analysis, loaded through the knowledge seam
   // (Supabase override, bundled fallback), and degrades to nothing on failure.
   let reference = "";
   let classical = "";
@@ -767,7 +846,7 @@ export async function runReadingPipeline(args: PipelineArgs): Promise<PipelineRe
   // Pass A — Judgment. If it fails, the composer still gets the raw brief.
   let dossier: JudgmentDossier | null = null;
   try {
-    dossier = await runJudgment(args, brief);
+    dossier = await runJudgment(args, brief, reference, classical);
   } catch (err) {
     console.error("[pipeline] judgment pass failed, composing from brief only:", err);
   }
@@ -783,11 +862,13 @@ export async function runReadingPipeline(args: PipelineArgs): Promise<PipelineRe
   let ethicsReview: EthicsReview | null = null;
   if (ethicsCodes.length) {
     try {
-      const { review, adjustments } = await runEthicsReview(args, reading, ethicsCodes);
+      const { review, adjustments } = await runEthicsReview(
+        args, reading, ethicsCodes, reference, classical
+      );
       ethicsReview = review; // keep the audit even if a later revision fails
       if (adjustments.length) {
         reading = await runEthicsRevision(
-          args, brief, composeDossier, reading, adjustments, covenant
+          args, brief, composeDossier, reading, adjustments, covenant, reference, classical
         );
         review.revised = true;
       }
@@ -799,9 +880,11 @@ export async function runReadingPipeline(args: PipelineArgs): Promise<PipelineRe
   // Pass C — Verification (+ one revision if it fails). Never blocks delivery.
   let verification: VerificationReport | null = null;
   try {
-    verification = await runVerification(brief, composeDossier, reading);
+    verification = await runVerification(brief, composeDossier, reading, reference, classical);
     if (!verification.approved && verification.issues.length) {
-      reading = await runRevision(args, brief, composeDossier, reading, verification.issues);
+      reading = await runRevision(
+        args, brief, composeDossier, reading, verification.issues, reference, classical
+      );
     }
   } catch (err) {
     console.error("[pipeline] verification pass failed, delivering draft as-is:", err);
@@ -811,7 +894,7 @@ export async function runReadingPipeline(args: PipelineArgs): Promise<PipelineRe
   // additive; a failure just means no notebook this time.
   let studyNotes: StudyNotes | null = null;
   try {
-    studyNotes = await runStudyNotes(args, brief, composeDossier, reading);
+    studyNotes = await runStudyNotes(args, brief, composeDossier, reading, reference, classical);
   } catch (err) {
     console.error("[pipeline] study-notes pass failed, delivering without notes:", err);
   }
