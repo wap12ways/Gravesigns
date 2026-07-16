@@ -1,9 +1,19 @@
 # GraveSigns — Build Plan: Professional Death-Chart Reading Engine
 
-Status: **plan / not yet implemented.** This document consolidates four source-grounded
-research passes (chart rendering, analysis math, sky/solar data, professional method)
-into a concrete architecture, reference data, and a phased build. Nothing here is built
-yet — it is the blueprint for enhancing the reading beyond the current text-only output.
+> ⚠️ **HISTORICAL — largely superseded.** This is the original blueprint. The
+> engine has since been **built and evolved well past it**: the pipeline is now
+> **six passes** (Judgment → Synthesis → Composition → Ethics → Verification →
+> Study Notes), **model-tiered** (Opus 4.8 for the reading, Sonnet 5 for the
+> ancillary passes), and it draws on a large retrieval-backed interpretive
+> **corpus** (`src/lib/knowledge/`). Treat the "3 Sonnet passes (A/B/C)" and
+> model notes below as **history, not current state.** For the current
+> architecture see **`CLAUDE.md`**, the **README**, and the **Addendum** at the
+> end of this file.
+
+Status (original): **plan / not yet implemented.** This document consolidates four
+source-grounded research passes (chart rendering, analysis math, sky/solar data,
+professional method) into a concrete architecture, reference data, and a phased
+build.
 
 ---
 

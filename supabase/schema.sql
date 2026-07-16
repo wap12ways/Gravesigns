@@ -33,8 +33,9 @@ create index if not exists readings_created_at_idx
   on public.readings (created_at desc);
 
 -- ── Migration for existing databases ─────────────────────────
--- If your `readings` table predates the three-pass pipeline, add the
--- dossier and natal_chart columns (safe to run repeatedly):
+-- If your `readings` table predates the multi-pass pipeline, add the
+-- dossier, natal_chart, ethics_review, and study_notes columns (safe to run
+-- repeatedly):
 alter table public.readings add column if not exists dossier jsonb;
 alter table public.readings add column if not exists natal_chart jsonb;
 alter table public.readings add column if not exists ethics_review jsonb;

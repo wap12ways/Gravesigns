@@ -22,8 +22,9 @@ transition.
 - **Next.js 15** (App Router) + **TypeScript**
 - **Tailwind CSS** + **shadcn/ui**-style components
 - **Supabase** (Postgres) for storing readings
-- **Anthropic Claude** for reading generation — five passes, each on a model you
-  choose (defaults to `claude-opus-4-8` everywhere; per-pass overridable)
+- **Anthropic Claude** for reading generation — six passes, model-tiered by
+  default (Opus 4.8 for the reading, Sonnet 5 for the ancillary passes) and
+  per-pass overridable
 - **Swiss Ephemeris** via **sweph-wasm** — the astrologer's gold-standard ephemeris (full DE431 `.se1` data files), compiled to WebAssembly, no native deps
 - Proper **time-zone resolution** (`tz-lookup` + `luxon`) with DST/historical rules
 - Premium form UX: a **searchable time-zone combobox** with live GMT-offset badges and a **place autocomplete** that pins exact coordinates
@@ -291,25 +292,31 @@ route awaits the full pipeline and returns the finished bundle as JSON; on the
 ## ✦ Customizing the reading voice
 
 The astrologer personas live in [`src/lib/pipeline.ts`](src/lib/pipeline.ts):
-`JUDGMENT_SYSTEM` (what evidence to weigh), `COMPOSITION_SYSTEM` (voice,
-integrity, and the section shape of every reading), `ETHICS_SYSTEM` (the
-ethical-alignment audit), `VERIFY_SYSTEM` (the integrity audit), and
-`STUDY_NOTES_SYSTEM` (the practitioner's notebook). Edit them there to retune
-the craft. The deterministic astrology it all builds on lives in
-[`src/lib/analysis/`](src/lib/analysis).
+`JUDGMENT_SYSTEM` (what evidence to weigh), `THEMES_SYSTEM` (the reading plan —
+core themes + arc), `COMPOSITION_SYSTEM` (voice, integrity, and the section shape
+of every reading), `ETHICS_SYSTEM` (the ethical-alignment audit), `VERIFY_SYSTEM`
+(the integrity audit), and `STUDY_NOTES_SYSTEM` (the practitioner's notebook).
+Edit them there to retune the craft. The deterministic astrology it all builds on
+lives in [`src/lib/analysis/`](src/lib/analysis); the interpretive corpus the
+passes draw on lives in [`src/lib/knowledge/`](src/lib/knowledge).
 
 ### Choosing a model per pass
 
-Each of the five passes picks its model from `MODELS` in
+Each of the six passes picks its model from `MODELS` in
 [`src/lib/pipeline.ts`](src/lib/pipeline.ts), and every pass is independently
 overridable by environment variable — so the pipeline can be tiered for cost or
-latency without a code change. All passes default to **`claude-opus-4-8`**;
-`ANTHROPIC_MODEL` sets the default for all at once, and the per-pass vars
-(`ANTHROPIC_MODEL_JUDGMENT`, `…_COMPOSITION`, `…_ETHICS`, `…_VERIFICATION`,
-`…_STUDY_NOTES`) override individual passes. The ethics and verification
-**rewrites** always run on the composition model, so the finished reading stays
-at composition grade no matter how cheaply the audits are tiered. See
-[`.env.example`](.env.example) for a ready cost-tiered profile.
+latency without a code change. **By default the passes are tiered**: composition
+and both rewrites run on **`claude-opus-4-8`** (the family-facing reading), while
+the five ancillary passes (judgment, synthesis, ethics audit, verification, study
+notes) default to **`claude-sonnet-5`** so the six-pass request fits inside a
+serverless time limit. `ANTHROPIC_MODEL` forces one model for all passes (set it
+to `claude-opus-4-8` for the all-Opus profile — slower, may exceed a 60s Hobby
+limit); `ANTHROPIC_MODEL_AUX` retunes the ancillary tier; and the per-pass vars
+(`ANTHROPIC_MODEL_JUDGMENT`, `…_THEMES`, `…_COMPOSITION`, `…_ETHICS`,
+`…_VERIFICATION`, `…_STUDY_NOTES`) override individual passes. The ethics and
+verification **rewrites** always run on the composition model, so the finished
+reading stays at composition grade no matter how cheaply the audits are tiered.
+See [`.env.example`](.env.example) for the full profile.
 
 ## ✦ On the astronomy
 
