@@ -1,20 +1,25 @@
 /**
- * The three-pass reading pipeline.
+ * The reading pipeline — one deterministic step and five Claude passes. Every
+ * pass picks its model from MODELS (default claude-opus-4-8, per-pass overridable).
  *
  *   Step 0  (deterministic, no AI) — computeChartAnalysis() tabulates every
  *           classical testimony from the raw chart.
- *   Pass A  Judgment      — Sonnet reads the evidence brief and returns a
+ *   Pass A  Judgment      — the model reads the evidence brief and returns a
  *                           structured, weighted dossier (JSON, tool-forced).
  *                           It weighs; it never composes or predicts cause/date.
- *   Pass B  Composition   — Sonnet turns the dossier + subject context into the
- *                           finished prose reading, born aligned to a short
- *                           ethical covenant loaded from the knowledge corpus.
- *   Pass E  Ethical Alignment — Sonnet audits the finished prose against the
+ *   Pass B  Composition   — the model turns the dossier + subject context into
+ *                           the finished prose reading, born aligned to a short
+ *                           ethical covenant, and deepened by the interpretive
+ *                           delineations and public-domain passages retrieved for
+ *                           the factors present in this chart.
+ *   Pass E  Ethical Alignment — the model audits the finished prose against the
  *                           loaded Code(s) of Ethics and revises it once if it
  *                           is materially misaligned. Runs after B, before C.
- *   Pass C  Verification  — Sonnet audits the draft against the chart for
+ *   Pass C  Verification  — the model audits the draft against the chart for
  *                           fabricated placements, forbidden claims, and tone,
  *                           and the draft is revised once if it fails.
+ *   Pass N  Study Notes   — the model keeps the practitioner's working notebook
+ *                           on the chart. Additive; runs last, degrades to null.
  *
  * Each pass degrades gracefully: if a later pass errors, the last good output
  * is returned so a reading is always produced.
@@ -128,13 +133,14 @@ function subjectLine(args: PipelineArgs): string {
 
 const JUDGMENT_SYSTEM = `You are the senior technical astrologer of GraveSigns, a death-chart practice. Your ONLY job in this pass is JUDGMENT — to read a pre-computed evidence brief and distill it into a weighted dossier of testimonies for a colleague who will write the reading.
 
-You are fluent in traditional and modern technique: essential and accidental dignity (Lilly's point scheme), sect, the Arabic Lots, the 8th/4th/12th complexes, the mortal significators (Saturn, Mars, Moon, Sun, the Nodes, Pluto), fixed stars, aspect patterns, and chart shape.
+You are fluent in traditional and modern technique: essential and accidental dignity (Lilly's point scheme), sect, the Arabic Lots, the 8th/4th/12th complexes, the mortal significators (Saturn, Mars, Moon, Sun, the Nodes, Pluto), the Ascendant and the ruler of the geniture, the lord of the 8th and where it is carried, the significators tenanting the 8th/4th/12th, the hard luminary–malefic contacts, fixed stars, aspect patterns, and chart shape.
 
 RULES OF THIS PASS
 - Work ONLY from the numbers in the brief. Never recompute astronomy; never invent a placement not present.
 - Produce EVIDENCE, not prose. Each factor is one source-anchored technical observation with an interpretive direction.
 - Weight by real astrological strength: dignity, angularity, tightness of orb, concordance across independent testimonies, and whether the factor depends on a birth time that may be missing.
 - Prefer testimonies that CONCUR. When three independent factors point at the same theme, say so via concordance.
+- Weight the DEATH-SPECIFIC testimonies highly: a significator (a malefic or a luminary) tenanting the 8th, 4th, or 12th, the condition and disposition of the lord of the 8th, and a hard luminary–malefic contact are among the weightiest evidence a death chart offers. Surface them as high-weight factors so the composer builds on them.
 - Be honest about limits. If houses/angles are absent, down-weight or suppress house-dependent and length-of-life techniques and record them in suppressed_techniques.
 - ABSOLUTELY FORBIDDEN: stating or implying a cause of death, a manner of death, a specific date, or any PREDICTION. This is a chart of a moment that already happened; you illuminate its meaning, you do not diagnose or predict. Flag any factor that tempts such a claim as indeterminate and steer its direction toward meaning, not mechanism.
 - If the brief contains the length-of-life doctrine (hyleg/alcocoden), you MAY record it DESCRIPTIVELY — as a classical technique read beside a life already complete, with the actual age noted for comparison. Never present it as having predicted or caused the death, and never extend it into a counterfactual.

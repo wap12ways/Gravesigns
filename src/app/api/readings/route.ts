@@ -152,8 +152,8 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // 2) Generate the reading through the three-pass pipeline
-  //    (Step-0 analysis → judgment → composition → verification).
+  // 2) Generate the reading through the pipeline (Step-0 analysis → judgment →
+  //    composition → ethics → verification → study notes).
   let reading: string;
   let dossier: JudgmentDossier | null = null;
   let ethicsReview: EthicsReview | null = null;
