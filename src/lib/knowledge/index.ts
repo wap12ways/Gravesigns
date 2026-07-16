@@ -15,12 +15,22 @@
  * That fallback is what lets the app run in demo mode, survive a schema lag, and
  * treat the DB as the editable source of truth without ever risking a reading.
  */
-import type { KnowledgeDocument, KnowledgeKind } from "../types";
+import type {
+  DelineationEntry,
+  DeathChart,
+  KnowledgeDocument,
+  KnowledgeKind,
+} from "../types";
+import type { ChartAnalysis } from "../analysis";
 import { getSupabase } from "../supabase";
 import { NCGR_CODE_OF_ETHICS } from "./documents/ncgr-code-of-ethics";
+import { DEATH_DELINEATIONS_DOC } from "./documents/death-delineations";
 
 /** Everything compiled into the app. New bundled documents are added here. */
-export const BUNDLED_DOCUMENTS: KnowledgeDocument[] = [NCGR_CODE_OF_ETHICS];
+export const BUNDLED_DOCUMENTS: KnowledgeDocument[] = [
+  NCGR_CODE_OF_ETHICS,
+  DEATH_DELINEATIONS_DOC,
+];
 
 function bundledByKind(kind: KnowledgeKind): KnowledgeDocument[] {
   return BUNDLED_DOCUMENTS.filter(
@@ -110,4 +120,154 @@ export function operatingSummary(docs: KnowledgeDocument[]): string {
 export function codeLabel(doc: KnowledgeDocument): string {
   const label = doc.metadata?.code_label;
   return typeof label === "string" && label.trim() ? label.trim() : doc.slug;
+}
+
+// ── Delineation corpus: retrieval ───────────────────────────────────────────
+// The interpretive layer. Delineation documents (kind `delineation`) carry a
+// factor-keyed array of entries in `metadata.entries`. We load them through the
+// same Supabase-with-bundled-fallback seam, then select ONLY the entries whose
+// key matches a factor actually present in the chart — so the composer gets
+// targeted depth, never the whole corpus.
+
+/** Load the active delineation documents (Supabase override, bundled fallback). */
+export function getDelineations(): Promise<KnowledgeDocument[]> {
+  return loadKnowledge("delineation");
+}
+
+/** Flatten the `metadata.entries` of a set of delineation documents. */
+export function delineationEntries(docs: KnowledgeDocument[]): DelineationEntry[] {
+  const out: DelineationEntry[] = [];
+  for (const d of docs) {
+    const entries = d.metadata?.entries;
+    if (Array.isArray(entries)) {
+      for (const e of entries) {
+        if (e && typeof e.key === "string" && typeof e.body === "string") {
+          out.push(e as DelineationEntry);
+        }
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * The set of factor keys actually present in a given chart + analysis. These are
+ * the tokens a delineation entry's `key` is matched against. Kept deterministic
+ * and dependency-light: it reads only the computed frame, never the ephemeris.
+ */
+export function activeFactorKeys(chart: DeathChart, analysis: ChartAnalysis): Set<string> {
+  const keys = new Set<string>();
+
+  const moon = chart.planets.find((p) => p.name === "Moon");
+  if (moon) keys.add(`moon:${moon.sign}`);
+  const sun = chart.planets.find((p) => p.name === "Sun");
+  if (sun) keys.add(`sun:${sun.sign}`);
+
+  if (chart.moonPhase) keys.add(`phase:${chart.moonPhase}`);
+  keys.add(`sect:${chart.sect}`);
+  if (chart.dominantElement) keys.add(`element:${chart.dominantElement}`);
+  if (chart.dominantModality) keys.add(`modality:${chart.dominantModality}`);
+  if (analysis.shape?.shape) keys.add(`shape:${analysis.shape.shape}`);
+
+  for (const m of analysis.death.mortalSignificators) keys.add(`significator:${m.name}`);
+  // The lunar nodes ride the chart's planet list under various labels.
+  if (chart.planets.some((p) => /node/i.test(p.name))) keys.add("significator:Nodes");
+
+  for (const h of analysis.death.houses) keys.add(`house:${h.house}`);
+
+  for (const lot of analysis.lots) {
+    if (/^Part of Fortune/.test(lot.name)) keys.add("lot:Part of Fortune");
+    if (/^Lot of Death/.test(lot.name)) keys.add("lot:Lot of Death");
+  }
+
+  for (const f of analysis.fixedStars) keys.add(`star:${f.star}`);
+
+  return keys;
+}
+
+/** Priority order when trimming to a bounded set — spine factors lead. */
+const FAMILY_RANK: Record<DelineationEntry["family"], number> = {
+  moon: 0,
+  phase: 1,
+  significator: 2,
+  house: 3,
+  lot: 4,
+  star: 5,
+  shape: 6,
+  sun: 7,
+  element: 8,
+  modality: 9,
+  sect: 10,
+};
+
+/**
+ * Select the delineation entries whose key matches a factor in this chart,
+ * de-duplicated by key and ranked so the interpretive spine (Moon, phase,
+ * significators, the death houses) comes first. Capped to keep the composition
+ * prompt bounded. Never throws — an empty corpus just yields no reference.
+ */
+export async function selectDelineations(
+  chart: DeathChart,
+  analysis: ChartAnalysis,
+  opts: { limit?: number } = {}
+): Promise<DelineationEntry[]> {
+  const limit = opts.limit ?? 18;
+  const docs = await getDelineations();
+  const all = delineationEntries(docs);
+  if (!all.length) return [];
+
+  const active = activeFactorKeys(chart, analysis);
+  const seen = new Set<string>();
+  const matched = all.filter((e) => {
+    if (!active.has(e.key) || seen.has(e.key)) return false;
+    seen.add(e.key);
+    return true;
+  });
+
+  matched.sort(
+    (a, b) => (FAMILY_RANK[a.family] ?? 99) - (FAMILY_RANK[b.family] ?? 99)
+  );
+  return matched.slice(0, limit);
+}
+
+/**
+ * Render selected delineations into the Markdown reference block folded into the
+ * composition pass. Grouped by family with light headers; every body is doctrine
+ * to SYNTHESIZE, never to quote.
+ */
+export function delineationBrief(entries: DelineationEntry[]): string {
+  if (!entries.length) return "";
+  const FAMILY_HEADING: Record<DelineationEntry["family"], string> = {
+    moon: "The Soul's Vehicle — the Moon",
+    phase: "The Lunar Phase",
+    significator: "The Mortal Significators & Karmic Axis",
+    house: "The Death-House Complex (8th · 4th · 12th)",
+    lot: "The Lots",
+    star: "Fixed-Star Contacts",
+    shape: "The Shape of the Whole",
+    sun: "The Luminary — the Sun",
+    element: "The Elemental Cast",
+    modality: "The Modal Cast",
+    sect: "The Sect of the Chart",
+  };
+
+  const order = Object.keys(FAMILY_RANK) as DelineationEntry["family"][];
+  const byFamily = new Map<DelineationEntry["family"], DelineationEntry[]>();
+  for (const e of entries) {
+    const list = byFamily.get(e.family) ?? [];
+    list.push(e);
+    byFamily.set(e.family, list);
+  }
+
+  const blocks: string[] = [];
+  for (const fam of order) {
+    const list = byFamily.get(fam);
+    if (!list?.length) continue;
+    blocks.push(`### ${FAMILY_HEADING[fam]}`);
+    for (const e of list) {
+      const src = e.source ? ` _(tradition: ${e.source})_` : "";
+      blocks.push(`- **${e.title}** — ${e.body}${src}`);
+    }
+  }
+  return blocks.join("\n");
 }

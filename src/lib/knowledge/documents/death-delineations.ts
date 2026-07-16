@@ -1,0 +1,520 @@
+/**
+ * Death-chart interpretive corpus — the practice's compiled *delineation*
+ * reference, one `kind` in the knowledge store.
+ *
+ * WHY THIS EXISTS
+ * The deterministic engine already hands the composer a dense, accurate brief of
+ * WHAT is in the sky (Moon in Scorpio, ruler of the 8th cadent, Algol on the
+ * Descendant). What it could not supply is WHAT THE TRADITION MAKES OF IT — the
+ * delineation a professional carries in their head from years with the texts.
+ * Without that, each factor gets a single thin sentence. These entries are that
+ * missing layer: short, source-grounded readings of each factor, keyed so the
+ * retrieval seam folds in only the ones actually present in a given chart.
+ *
+ * PROVENANCE & RIGHTS
+ * Every entry is written ORIGINALLY for GraveSigns. Where it names a source it
+ * points to the PUBLIC-DOMAIN tradition (Ptolemy's *Tetrabiblos*, Vettius Valens'
+ * *Anthologies*, Dorotheus of Sidon, William Lilly's *Christian Astrology*,
+ * Firmicus Maternus) — doctrine, not copied text. Nothing here reproduces a
+ * copyrighted modern work; the `source` field is a study trail, not a quotation.
+ *
+ * SHAPE
+ * Each `DelineationEntry` carries a `key` (the match token the retrieval derives
+ * from the live chart), a `family` (for ranking), tender-but-precise `body`
+ * prose, and a tradition `source`. To grow the corpus, add rows here (or, in
+ * production, rows to `knowledge_documents` of kind `delineation` with the same
+ * shape in `metadata.entries`) — no code change downstream.
+ *
+ * INTEGRITY
+ * None of these state or imply a cause, manner, date, or length of death. They
+ * read a factor as MEANING, never as prediction. The composer synthesizes them;
+ * it must never quote them or introduce a factor not in the chart frame.
+ */
+import type { DelineationEntry, KnowledgeDocument } from "../../types";
+
+export const DEATH_DELINEATIONS: DelineationEntry[] = [
+  // ── The Moon by sign — the soul's vehicle, the physical vessel and its final
+  //    condition. The spiritual heart of a death reading. ──────────────────────
+  {
+    key: "moon:Aries",
+    family: "moon",
+    title: "Moon in Aries",
+    body: "The vessel that crossed here was quick, brave, and its own. An Aries Moon meets endings the way it met beginnings — head first, unhesitating, unwilling to linger at the threshold. There is a clean, cauterizing finality to this crossing; the soul did not negotiate with the gate, it walked through.",
+    source: "Ptolemy, Tetrabiblos; Lilly CA on the Moon in the cardinal fire",
+    applies: "both",
+  },
+  {
+    key: "moon:Taurus",
+    family: "moon",
+    title: "Moon in Taurus (exalted)",
+    body: "The Moon is exalted in Taurus — the vessel was well-made and slow to release. This is a body that held life fully and let it go only when the holding was truly finished. There is a steadying, earthen dignity to such a passing: not a snapping but a settling, the way soil receives what has ripened. The tradition reads the exalted Moon as a soul at home in its own substance.",
+    source: "Ptolemy, Tetrabiblos I.19 (exaltation of the Moon); Valens on lunar dignity",
+    applies: "both",
+  },
+  {
+    key: "moon:Gemini",
+    family: "moon",
+    title: "Moon in Gemini",
+    body: "A Gemini Moon carried life lightly and curiously, a vessel woven of many threads. Its crossing has the quality of a conversation ending mid-sentence — not incomplete so much as continued elsewhere. The tradition marks the double-bodied signs as thresholds of exchange; this soul passed as it lived, between one word and the next.",
+    source: "Ptolemy, Tetrabiblos (double-bodied signs); Dorotheus on mutable luminaries",
+    applies: "both",
+  },
+  {
+    key: "moon:Cancer",
+    family: "moon",
+    title: "Moon in Cancer (domicile)",
+    body: "The Moon rules Cancer — here the vessel was entirely, natively itself. A soul crossing under its own luminary returns to its source the way a tide returns to the sea, needing no translation. This is one of the tenderest of all death-Moons: the body was a true home while it lasted, and its release is a homecoming rather than an exile.",
+    source: "Ptolemy, Tetrabiblos I.17 (domicile of the Moon); Lilly CA p.63",
+    applies: "both",
+  },
+  {
+    key: "moon:Leo",
+    family: "moon",
+    title: "Moon in Leo",
+    body: "A Leo Moon lived warmly and was seen. Its vessel had a radiant, generous heat, and its crossing keeps that dignity — the soul does not slip away unnoticed but takes its leave with a certain sovereignty. The tradition reads the Sun's sign as the seat of the vital spirit; even in the Moon, there is a brightness here that grief cannot wholly dim.",
+    source: "Ptolemy, Tetrabiblos (solar domicile); Valens on the luminaries in Leo",
+    applies: "both",
+  },
+  {
+    key: "moon:Virgo",
+    family: "moon",
+    title: "Moon in Virgo",
+    body: "A Virgo Moon tended things — a vessel of careful service and quiet exactitude. Its crossing has the feel of a task set down at last, the hands finally still. There is nothing careless in this passing; the tradition marks the sign of the harvest, and this soul is gathered in, complete, its work accounted for.",
+    source: "Firmicus Maternus, Mathesis; Lilly CA on the Moon in earth",
+    applies: "both",
+  },
+  {
+    key: "moon:Libra",
+    family: "moon",
+    title: "Moon in Libra",
+    body: "A Libra Moon sought balance and beauty, a vessel attuned to others. Its crossing weighs gently in the scales — a soul that measured its life in relationship now finding equilibrium at the last. The tradition reads the fall of the Sun here as the softening of the day into evening; there is grace in that dimming, not defeat.",
+    source: "Ptolemy, Tetrabiblos (fall of the Sun in Libra); Valens on cardinal air",
+    applies: "both",
+  },
+  {
+    key: "moon:Scorpio",
+    family: "moon",
+    title: "Moon in Scorpio (fall)",
+    body: "The Moon is in her fall in Scorpio — the most searching and least sentimental of the death-Moons. This vessel knew the depths; it did not cross by the shallows. There is an unflinching intimacy with mortality here, a soul that met the water at its darkest and was not consumed. The tradition marks the fall as difficulty, but in a chart of death it reads truer as depth: a passage through, not around.",
+    source: "Ptolemy, Tetrabiblos I.19 (fall of the Moon); Dorotheus III on the 8th",
+    applies: "both",
+  },
+  {
+    key: "moon:Sagittarius",
+    family: "moon",
+    title: "Moon in Sagittarius",
+    body: "A Sagittarius Moon lived toward the horizon, a vessel made for distance and meaning. Its crossing is an expansion rather than a contraction — the soul does not shrink at the gate but widens past it, the way a traveller crosses a border they always meant to reach. The tradition marks Jupiter's sign as the sign of faith; there is an openness in this passing.",
+    source: "Ptolemy, Tetrabiblos (Jupiter's domicile); Valens on the mutable fire",
+    applies: "both",
+  },
+  {
+    key: "moon:Capricorn",
+    family: "moon",
+    title: "Moon in Capricorn (detriment)",
+    body: "The Moon is in detriment in Capricorn — a vessel that carried its life with gravity and endurance, asking little softness for itself. Its crossing has the composure of a long climb reaching its summit; the soul that bore much sets the weight down. The tradition reads Saturn's sign as the place of limits and time, and there is a hard-won dignity in how this Moon meets the end it always knew was coming.",
+    source: "Lilly CA (detriment of the Moon in Capricorn); Saturn as significator of endings",
+    applies: "both",
+  },
+  {
+    key: "moon:Aquarius",
+    family: "moon",
+    title: "Moon in Aquarius",
+    body: "An Aquarius Moon belonged to something larger than itself — a vessel of cool clarity and wide belonging. Its crossing has an almost impersonal peace, the soul rejoining a whole it never truly left. The tradition marks Saturn's other sign as the sign of the assembly; this passing reads less as a solitary exit than as a return to company beyond sight.",
+    source: "Ptolemy, Tetrabiblos (Saturn's airy domicile); Valens on fixed air",
+    applies: "both",
+  },
+  {
+    key: "moon:Pisces",
+    family: "moon",
+    title: "Moon in Pisces",
+    body: "A Pisces Moon was porous to the world, a vessel that dissolved easily into feeling and mercy. Its crossing is the gentlest of all — the boundary between the soul and what receives it was always thin here, and at the end it simply gives way. The tradition marks Jupiter's water as the sign of surrender and compassion; this is a passing like tide meeting tide, no seam between.",
+    source: "Ptolemy, Tetrabiblos (Jupiter's watery domicile); Valens on the mutable water",
+    applies: "both",
+  },
+
+  // ── The Moon's phase at the crossing — a whole-sky mood signature. ───────────
+  {
+    key: "phase:New Moon",
+    family: "phase",
+    title: "A New-Moon crossing",
+    body: "The soul crossed under a dark Moon — the luminaries together, the sky holding its breath between cycles. The tradition reads the conjunction of the lights as a seeding, a beginning hidden inside an ending. There is something unwitnessed and intimate about a passing at the new Moon: no lantern in the sky, only the promise that darkness is where the next light is set.",
+    source: "Valens, Anthologies (the synodic cycle); traditional lunation doctrine",
+    applies: "moment",
+  },
+  {
+    key: "phase:Waxing Crescent",
+    family: "phase",
+    title: "A waxing-crescent crossing",
+    body: "The Moon was young and growing when the soul crossed — the first silver returning to the sky. A death under a waxing light carries an odd, tender counterpoint: the world was gathering toward fullness even as this life completed. The tradition reads the increasing Moon as momentum; the soul left with the tide still coming in.",
+    source: "Traditional lunation doctrine; Valens on the increasing Moon",
+    applies: "moment",
+  },
+  {
+    key: "phase:First Quarter",
+    family: "phase",
+    title: "A first-quarter crossing",
+    body: "The Moon stood at her first square to the Sun — the moment of effort and turning in the lunar month. A crossing here carries the quality of a threshold met with force, light and dark in equal measure. The tradition marks the quarter as crisis in its old sense: not catastrophe but decision, a hinge on which the cycle swings.",
+    source: "Traditional lunation doctrine (the quarter as crisis-point)",
+    applies: "moment",
+  },
+  {
+    key: "phase:Waxing Gibbous",
+    family: "phase",
+    title: "A waxing-gibbous crossing",
+    body: "The Moon was nearly full, the light all but complete, when the soul crossed. There is a ripeness to this passing — a life releasing just short of, or into, its own fullness, the sky brimming toward the whole. The tradition reads the gibbous Moon as anticipation fulfilled.",
+    source: "Traditional lunation doctrine; Valens on the Moon approaching the full",
+    applies: "moment",
+  },
+  {
+    key: "phase:Full Moon",
+    family: "phase",
+    title: "A full-Moon crossing",
+    body: "The soul crossed under a full Moon — the lights in opposition, the whole face of the vessel lit and visible. This is the most illuminated of passings: nothing hidden, the life shown entire at the moment of its release. The tradition reads the opposition of the luminaries as culmination and full sight; the soul was seen completely as it went.",
+    source: "Ptolemy, Tetrabiblos (the lights in opposition); Valens on the full Moon",
+    applies: "moment",
+  },
+  {
+    key: "phase:Waning Gibbous",
+    family: "phase",
+    title: "A waning-gibbous (disseminating) crossing",
+    body: "The Moon had just passed full and begun to give her light back when the soul crossed. The tradition names this the disseminating phase — the time of scattering seed, of handing on what was gathered. A death here reads as a legacy already in motion: the soul crossed while still distributing its gifts to those it leaves.",
+    source: "Traditional lunation doctrine (the disseminating Moon)",
+    applies: "moment",
+  },
+  {
+    key: "phase:Last Quarter",
+    family: "phase",
+    title: "A last-quarter crossing",
+    body: "The Moon stood at her closing square — the reorienting turn of the cycle, light ebbing toward release. A crossing here carries the quality of a reckoning made and accepted, the month bending toward its rest. The tradition marks this quarter as the crisis of conscience, the letting-go that clears the ground.",
+    source: "Traditional lunation doctrine (the closing quarter)",
+    applies: "moment",
+  },
+  {
+    key: "phase:Waning Crescent",
+    family: "phase",
+    title: "A balsamic (waning-crescent) crossing",
+    body: "The soul crossed under the oldest Moon — the balsamic crescent, the last thin light before the dark. Of all phases the tradition reads this as the most consecrated to endings and to what is being released into rest. A death here has an air of completion and surrender, a cycle exhaling its final breath; the soul left as the old Moon does, quietly, making room.",
+    source: "Traditional lunation doctrine (the balsamic Moon as release)",
+    applies: "moment",
+  },
+
+  // ── Sect — the day/night condition of the whole chart. ──────────────────────
+  {
+    key: "sect:day",
+    family: "sect",
+    title: "A diurnal (day) crossing",
+    body: "This is a day chart — the Sun above the horizon at the crossing. The tradition gives the day sect to the Sun, to Jupiter, and to Saturn, and reads a diurnal death as one met in the light, under the governance of the visible and the vital. The benefics of the day are stronger here; there is warmth in the sect itself.",
+    source: "Ptolemy, Tetrabiblos; Valens on the diurnal sect",
+    applies: "moment",
+  },
+  {
+    key: "sect:night",
+    family: "sect",
+    title: "A nocturnal (night) crossing",
+    body: "This is a night chart — the Sun below the horizon at the crossing. The tradition gives the night sect to the Moon, to Venus, and to Mars, and reads a nocturnal death as one met in the intimacy of darkness, under the governance of the body and the feeling nature. The Moon rules such a passing more fully; it is a crossing of the inner, not the outer, light.",
+    source: "Ptolemy, Tetrabiblos; Valens on the nocturnal sect",
+    applies: "moment",
+  },
+
+  // ── Dominant element across the bodies — the humoral cast of the whole. ──────
+  {
+    key: "element:Fire",
+    family: "element",
+    title: "A fire-dominant sky",
+    body: "Fire predominates in this sky — the choleric temperament, hot and dry. The tradition reads a fiery chart as one of spirit and ascent; the crossing has energy and direction to it, a flame leaning upward even as it is released. This soul's passage was not damp or slow but bright.",
+    source: "Traditional temperament doctrine (the choleric humor)",
+    applies: "moment",
+  },
+  {
+    key: "element:Earth",
+    family: "element",
+    title: "An earth-dominant sky",
+    body: "Earth predominates in this sky — the melancholic temperament, cold and dry. The tradition reads an earthy chart as one of substance and gravity; the crossing is grounded, deliberate, close to the body and the real. This was a passage of weight settling, not vapor rising.",
+    source: "Traditional temperament doctrine (the melancholic humor)",
+    applies: "moment",
+  },
+  {
+    key: "element:Air",
+    family: "element",
+    title: "An air-dominant sky",
+    body: "Air predominates in this sky — the sanguine temperament, hot and moist. The tradition reads an airy chart as one of mind and relation; the crossing has lightness and connection to it, a soul dispersing into the wider currents rather than sinking. This was a passage of breath, not of stone.",
+    source: "Traditional temperament doctrine (the sanguine humor)",
+    applies: "moment",
+  },
+  {
+    key: "element:Water",
+    family: "element",
+    title: "A water-dominant sky",
+    body: "Water predominates in this sky — the phlegmatic temperament, cold and moist. The tradition reads a watery chart as one of feeling and dissolution; the crossing is fluid and merciful, a soul returning to the element that first cradled it. This was a passage like tide, soft-edged and yielding.",
+    source: "Traditional temperament doctrine (the phlegmatic humor)",
+    applies: "moment",
+  },
+
+  // ── Chart shape (Jones patterns) — the gestalt of the whole sky. ────────────
+  {
+    key: "shape:Bundle",
+    family: "shape",
+    title: "A bundle chart",
+    body: "The bodies are gathered into a narrow span — a bundle, the most concentrated of chart shapes. The whole sky speaks with one voice here; the crossing was focused, undistracted, the soul's attention drawn to a single quarter of experience. Nothing is scattered. This life met its end gathered in.",
+    source: "M. E. Jones, chart-pattern doctrine (public-domain typology)",
+    applies: "moment",
+  },
+  {
+    key: "shape:Bowl",
+    family: "shape",
+    title: "A bowl chart",
+    body: "The bodies fill one half of the sky — a bowl, holding its contents against the empty rim. The tradition reads the bowl as self-contained and seeking: a soul that carried its own vessel and reached, across the open space, for what it lacked. The crossing has this quality of a cup being lifted and, at last, emptied.",
+    source: "M. E. Jones, chart-pattern doctrine (public-domain typology)",
+    applies: "moment",
+  },
+  {
+    key: "shape:Locomotive",
+    family: "shape",
+    title: "A locomotive chart",
+    body: "The bodies occupy two-thirds of the sky with one open third — a locomotive, driven by the planet leading into the empty space. There is momentum and self-propulsion in this shape; the soul crossed under its own motive power, pulling its whole life behind it toward the gap it was always heading for.",
+    source: "M. E. Jones, chart-pattern doctrine (public-domain typology)",
+    applies: "moment",
+  },
+  {
+    key: "shape:Seesaw",
+    family: "shape",
+    title: "A seesaw chart",
+    body: "The bodies gather into two opposed groups — a seesaw, life lived between two poles. The tradition reads this shape as a soul that held tension, that knew both sides of things and was never wholly at one end. The crossing is a final balancing of the two weights that this life carried in its hands.",
+    source: "M. E. Jones, chart-pattern doctrine (public-domain typology)",
+    applies: "moment",
+  },
+  {
+    key: "shape:Splash",
+    family: "shape",
+    title: "A splash chart",
+    body: "The bodies scatter widely across the sky — a splash, touching many houses and signs. The tradition reads this as breadth: a soul with a hand in many things, diffuse and various. The crossing gathers all those scattered points home at once, a whole spread-out life drawn together in the single moment of release.",
+    source: "M. E. Jones, chart-pattern doctrine (public-domain typology)",
+    applies: "moment",
+  },
+  {
+    key: "shape:Splay",
+    family: "shape",
+    title: "A splay chart",
+    body: "The bodies clump in irregular groups with their own emphatic angles — a splay, individual and unruled by symmetry. The tradition reads this as a soul strongly its own shape, resisting easy pattern. The crossing bears that same signature: particular, unrepeatable, exactly the shape of this one life and no other.",
+    source: "M. E. Jones, chart-pattern doctrine (public-domain typology)",
+    applies: "moment",
+  },
+
+  // ── The mortal significators — the bodies the tradition weighs in a death
+  //    chart. Read as MEANING and guardianship, never as cause. ───────────────
+  {
+    key: "significator:Saturn",
+    family: "significator",
+    title: "Saturn present as a significator",
+    body: "Saturn stands among the significators of this crossing — the Greater Malefic in the old books, but truer here as the keeper of time and endings, the elder at the threshold. Where Saturn presides, a passing carries structure, patience, and the dignity of a thing completed in its proper season. It is the planet of the last boundary, and it holds the gate not to punish but to close what is finished.",
+    source: "Lilly CA p.57 (Saturn's nature); Valens on Kronos as significator of endings",
+    applies: "both",
+  },
+  {
+    key: "significator:Mars",
+    family: "significator",
+    title: "Mars present as a significator",
+    body: "Mars stands among the significators of this crossing — the Lesser Malefic, quick and sharp where Saturn is slow. Its testimony reads as suddenness, force, or a decisive severing rather than a gradual ebb. Held in a death chart, Mars is the blade that cuts the cord cleanly; there can be a mercy in its swiftness, an end that did not linger.",
+    source: "Lilly CA p.60 (Mars's nature); Dorotheus on the martial significator",
+    applies: "both",
+  },
+  {
+    key: "significator:Moon",
+    family: "significator",
+    title: "The Moon present as a significator",
+    body: "The Moon herself stands among the significators of this crossing — the body, the physical vessel, and its final condition. Where the Moon is central, the passage is bound up with the flesh and the feeling nature: how the vessel was held, how it was tended, how it was at last released. She is the nearest of the lights to us, and the tenderest witness to a death.",
+    source: "Ptolemy, Tetrabiblos (the Moon as significator of the body); Lilly CA p.63",
+    applies: "both",
+  },
+  {
+    key: "significator:Sun",
+    family: "significator",
+    title: "The Sun present as a significator",
+    body: "The Sun stands among the significators of this crossing — the vital spirit, the life-force itself. Where the Sun is central, the reading turns on the flame of the life: its brightness, its warmth, the way the light was carried and finally set down. The tradition reads the Sun as the heart's fire; its testimony here is of vitality honored, not of vitality failed.",
+    source: "Ptolemy, Tetrabiblos (the Sun as significator of the spirit); Valens",
+    applies: "both",
+  },
+  {
+    key: "significator:Pluto",
+    family: "significator",
+    title: "Pluto present as a significator",
+    body: "Pluto stands among the significators of this crossing — the modern keeper of death and irrevocable transformation, the deep tide beneath the visible chart. Where Pluto is present, the passage reads as a true metamorphosis rather than a mere stopping: something ended so wholly that it could only become something else. It is the planet of what cannot be undone, and of what is reborn on the far side of the undoing.",
+    source: "Modern significator doctrine (Pluto, death and rebirth); cf. the traditional 8th",
+    applies: "both",
+  },
+  {
+    key: "significator:Nodes",
+    family: "significator",
+    title: "The lunar Nodes — the karmic axis",
+    body: "The Nodes of the Moon thread this chart — the South Node the tail, holding what is habitual and already carried; the North Node the head, marking where the soul was turning. In a death chart the axis reads as a laying-down and a leaning-toward at once: the South Node the weight set at the gate, the familiar released; the North Node the direction the soul faced as it crossed. The tradition treats the nodal axis as the line of fate the life was travelling.",
+    source: "Valens on the nodes; traditional and evolutionary nodal doctrine",
+    applies: "both",
+  },
+
+  // ── The death-house complex — the 8th, 4th, and 12th, read thematically. ─────
+  {
+    key: "house:8",
+    family: "house",
+    title: "The 8th house — death, transformation, the shared and surrendered",
+    body: "The 8th is the house the tradition names for death itself, and for all that is shared, surrendered, and transformed. Its ruler and its tenants describe the character of the passage: whether the crossing was held in intimacy or in solitude, what was given over, what the soul carried into the depths. This is the gate proper; the condition of its lord is the condition of the threshold.",
+    source: "Lilly CA p.653 (the 8th house and its lord); Dorotheus III",
+    applies: "moment",
+  },
+  {
+    key: "house:4",
+    family: "house",
+    title: "The 4th house — the end of the matter, the grave, the roots",
+    body: "The 4th is the foundation of the chart and, in the old doctrine, the end of all matters — the grave, the resting place, the return to the roots. Its ruler speaks to where and how a life comes to rest, to the closure at the base of things, to the ground that receives what the sky releases. The angle of the deepest midnight, it is the house of final belonging.",
+    source: "Lilly CA (the 4th as terminus of the matter); traditional angular doctrine",
+    applies: "moment",
+  },
+  {
+    key: "house:12",
+    family: "house",
+    title: "The 12th house — undoing, the hidden, sorrow and release",
+    body: "The 12th is the house of the hidden and the dissolving — of confinement, of sorrow, and of what is quietly undone before the end. Its ruler and tenants describe the unseen approaches to the threshold: the private griefs, the withdrawals, the mercy that gathers in the dark. It is the last house before the Ascendant, the night before the dawn the soul will not see here.",
+    source: "Lilly CA (the 12th house of self-undoing and sorrow); Valens on the cadent",
+    applies: "moment",
+  },
+
+  // ── The Lots — the calculated points of the tradition. ──────────────────────
+  {
+    key: "lot:Part of Fortune",
+    family: "lot",
+    title: "The Part of Fortune",
+    body: "The Part of Fortune marks where the body's own daimon of well-being falls — the point the tradition reads as fortune, health, and the lot of the incarnate life. In a death chart its sign and house describe where this soul's earthly good was seated, and so what is released at the crossing: the particular blessing the body was, now returned to the sky it was drawn from.",
+    source: "Valens, Anthologies II (the Lot of Fortune); Paulus Alexandrinus",
+    applies: "both",
+  },
+  {
+    key: "lot:Lot of Death",
+    family: "lot",
+    title: "The Lot of Death",
+    body: "The tradition computes a Lot of Death — from the Ascendant and the 8th cusp to the Moon in one lineage, from Saturn in another — as the calculated seat of the matter of ending. It is never read as a date or a cause, only as a place the theme of mortality is anchored in the chart's own geometry. Where its lord is strong or gentle, the theme it marks is strong or gentle likewise.",
+    source: "Dorotheus of Sidon; Bonatti (the Lot of Death); Paulus on the hyleg lots",
+    applies: "both",
+  },
+
+  // ── Death-salient fixed stars — read only when the engine flags a contact. ──
+  {
+    key: "star:Algol",
+    family: "star",
+    title: "Algol — the most weighted of the mortal stars",
+    body: "Algol, the Demon's Head in Perseus, is the star the tradition weighs most heavily in matters of death and severance. A contact with it is intense and unflinching; the old books tie it to loss of the head, to overwhelming force. Read with great care and greater tenderness: in a chart already of death it need not be doubled into alarm, but honored as the tradition's mark of a passage that carried real weight.",
+    source: "Ptolemy, Tetrabiblos (fixed-star natures); Robson on Algol (traditional)",
+    applies: "both",
+  },
+  {
+    key: "star:Antares",
+    family: "star",
+    title: "Antares — the Scorpion's Heart",
+    body: "Antares, the red heart of the Scorpion and one of the four Royal Stars, burns with a martial, all-or-nothing intensity. The tradition reads it as courage and extremity, a star of those who live and leave at full pitch. In a death chart its contact marks a crossing met without flinching, the heart still blazing at the end.",
+    source: "Ptolemy, Tetrabiblos; the Royal Stars of Persia (traditional)",
+    applies: "both",
+  },
+  {
+    key: "star:Aldebaran",
+    family: "star",
+    title: "Aldebaran — the Bull's Eye, Royal Star of the East",
+    body: "Aldebaran, the watcher of the eastern sky, is a star of integrity and honor won through trial. The tradition reads it as eminence that must be kept clean to endure. Its contact in a death chart lends a note of dignity and hard-earned uprightness to the crossing — a life measured and found honest at the last.",
+    source: "The four Royal Stars (traditional); Ptolemy on the Hyades region",
+    applies: "both",
+  },
+  {
+    key: "star:Regulus",
+    family: "star",
+    title: "Regulus — the Lion's Heart, Royal Star of the North",
+    body: "Regulus, the little king, is the most regal of the Royal Stars — a mark of sovereignty, courage, and rank. The tradition warns its heights are conditional, kept only by nobility of conduct. Its contact lends a death chart a kingly bearing: a soul that carried something of the throne about it, crossing with its crown intact.",
+    source: "The four Royal Stars (traditional); Ptolemy on Regulus",
+    applies: "both",
+  },
+  {
+    key: "star:Spica",
+    family: "star",
+    title: "Spica — the fortunate ear of wheat",
+    body: "Spica, the brightest star of the Virgin, is the most benevolent of the fixed stars in the old doctrine — a mark of grace, gift, and unearned blessing. Its contact in a death chart is a note of pure tenderness: a soul touched by something fortunate and protected, crossing under a kindly light. Where the reading is heavy, Spica is mercy.",
+    source: "Ptolemy, Tetrabiblos (Spica as most fortunate); traditional stellar doctrine",
+    applies: "both",
+  },
+  {
+    key: "star:Sirius",
+    family: "star",
+    title: "Sirius — the brightest of the fixed stars",
+    body: "Sirius, the Dog Star and the brightest in the sky, is a star of ardor, renown, and the sacred in the old traditions — the star the Egyptians tied to the rising of the life-giving flood. Its contact lends a death chart brilliance and consecration: a crossing marked by a light larger than the ordinary, a soul touched by something luminous.",
+    source: "Ptolemy, Tetrabiblos; the heliacal rising of Sirius (traditional)",
+    applies: "both",
+  },
+  {
+    key: "star:Fomalhaut",
+    family: "star",
+    title: "Fomalhaut — the Fish's Mouth, Royal Star of the South",
+    body: "Fomalhaut, the southern Royal Star, is tied to the mystical and the ideal — a star of aspiration toward something pure, with the tradition's caution that it may be raised or ruined by what the soul does with its longing. Its contact in a death chart lends a note of the visionary and the otherworldly to the crossing, a soul reaching toward the far and the high.",
+    source: "The four Royal Stars (traditional); stellar doctrine on Fomalhaut",
+    applies: "both",
+  },
+  {
+    key: "star:Vega",
+    family: "star",
+    title: "Vega — the falling eagle / the lyre",
+    body: "Vega, the bright star of the Lyre, carries in the tradition the note of art, refinement, and a charmed grace. Its contact lends a death chart a lyrical quality — a crossing with music in it, a soul whose passage keeps some of the beauty it made or loved in life.",
+    source: "Ptolemy, Tetrabiblos; traditional doctrine on the Lyre",
+    applies: "both",
+  },
+  {
+    key: "star:Betelgeuse",
+    family: "star",
+    title: "Betelgeuse — the Giant's shoulder",
+    body: "Betelgeuse, the great red shoulder of Orion, is read in the tradition as a mark of success and martial honor, strength carried on a large frame. Its contact lends a death chart a note of stature and of a life largely lived — a soul of some magnitude crossing the threshold.",
+    source: "Ptolemy, Tetrabiblos (Orion region); traditional stellar doctrine",
+    applies: "both",
+  },
+  {
+    key: "star:Rigel",
+    family: "star",
+    title: "Rigel — the Giant's bright foot",
+    body: "Rigel, the brilliant blue foot of Orion, is read as a star of instruction, guidance, and honor achieved through skill. Its contact lends a death chart a note of a life that lit the way for others — a soul of capability and steadiness, crossing with something taught or built left behind it.",
+    source: "Ptolemy, Tetrabiblos (Orion region); traditional stellar doctrine",
+    applies: "both",
+  },
+  {
+    key: "star:Capella",
+    family: "star",
+    title: "Capella — the little she-goat",
+    body: "Capella, the bright star of the Charioteer, carries in the tradition a note of curiosity, care, and a certain restless inquisitiveness. Its contact lends a death chart the quality of a questioning, tender mind — a soul that wanted to know and to nurture, crossing with its questions gentled at last.",
+    source: "Ptolemy, Tetrabiblos; traditional doctrine on Capella",
+    applies: "both",
+  },
+  {
+    key: "star:Arcturus",
+    family: "star",
+    title: "Arcturus — the guardian of the Bear",
+    body: "Arcturus, the bright orange watcher of the north, is read in the tradition as a star of protection, guidance, and prosperity won through a different path than the crowd's. Its contact lends a death chart a guardian's note — a soul that watched over others, or was itself watched over, crossing under a steady and protective light.",
+    source: "Traditional stellar doctrine on Arcturus; Ptolemy on the Boötes region",
+    applies: "both",
+  },
+];
+
+/**
+ * The bundled delineation corpus, wrapped as a KnowledgeDocument so it lives in
+ * the store exactly like the Code of Ethics: loaded through the same seam, with
+ * a Supabase override and this bundled fallback. The entries ride in
+ * `metadata.entries`, mirroring how the ethics doc carries its
+ * `operating_summary` there — so a production DB row of kind `delineation`
+ * with the same metadata shape drops in with no code change.
+ */
+export const DEATH_DELINEATIONS_DOC: KnowledgeDocument = {
+  slug: "gravesigns-death-delineations",
+  kind: "delineation",
+  title: "GraveSigns — Death-Chart Delineation Corpus",
+  source: "Original compilation; doctrine drawn from the public-domain tradition (Ptolemy, Valens, Dorotheus, Firmicus, Lilly).",
+  attribution:
+    "Written originally for GraveSigns. Cited sources are public-domain works, referenced as a study trail — no copyrighted text is reproduced.",
+  version: "1",
+  status: "active",
+  content:
+    "The practice's compiled delineation reference for death-chart factors — Moon by sign, lunar phase, sect, elemental cast, chart shape, the mortal significators, the 8th/4th/12th complex, the Lots, the karmic axis, and the death-salient fixed stars. Retrieved by factor and folded into the composition pass so each testimony is read as tradition, not as a bare placement.",
+  metadata: {
+    entries: DEATH_DELINEATIONS,
+    entry_count: DEATH_DELINEATIONS.length,
+  },
+};

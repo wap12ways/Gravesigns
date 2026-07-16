@@ -140,6 +140,10 @@ export interface VerificationReport {
 // optionally, new `KnowledgeKind` values.
 export type KnowledgeKind =
   | "code_of_ethics"
+  // The interpretive corpus: factor-keyed delineations the composition pass
+  // draws on for depth (Moon-by-sign, the mortal significators, the death
+  // houses, the Lots, the fixed stars). Entries ride in `metadata.entries`.
+  | "delineation"
   // Reserved for later phases — listed so the type never has to be widened in a
   // breaking way. Consumers should treat KnowledgeKind as open-ended.
   | "association_standard"
@@ -148,6 +152,43 @@ export type KnowledgeKind =
   | "published_reading"
   | "case_data"
   | (string & {});
+
+/**
+ * One interpretive delineation in the death-chart corpus (kind `delineation`).
+ * The composition pass reads only the entries whose `key` matches a factor
+ * actually present in the chart, so the reference stays targeted, not a dump.
+ * The bodies are traditional doctrine read as MEANING — never a cause, manner,
+ * date, or length of death, and never quoted verbatim into the reading.
+ */
+export interface DelineationEntry {
+  /**
+   * The match token the retrieval derives from the live chart, e.g.
+   * "moon:Scorpio", "phase:Full Moon", "sect:night", "significator:Saturn",
+   * "house:8", "lot:Lot of Death", "star:Algol", "shape:Bowl", "element:Water".
+   */
+  key: string;
+  /** The factor family, used to rank and group what is retrieved. */
+  family:
+    | "moon"
+    | "sun"
+    | "phase"
+    | "sect"
+    | "element"
+    | "modality"
+    | "shape"
+    | "significator"
+    | "house"
+    | "lot"
+    | "star";
+  /** Short label shown in the reference brief. */
+  title: string;
+  /** The interpretive delineation — traditional doctrine, tender and precise. */
+  body: string;
+  /** The tradition the doctrine comes from — a study trail, not a quotation. */
+  source?: string;
+  /** Whether the entry reads on a single moment, a nativity, or both. */
+  applies?: "moment" | "natal" | "both";
+}
 
 /**
  * One document in the knowledge corpus. `content` is the canonical text

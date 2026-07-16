@@ -36,7 +36,13 @@ import { computeChartAnalysis } from "./analysis";
 import { analysisToText, natalContextToText } from "./analysis/serialize";
 import { computeLifespan } from "./analysis/lifespan";
 import { computeCrossAspects } from "./analysis/synastry";
-import { getCodesOfEthics, operatingSummary, codeLabel } from "./knowledge";
+import {
+  getCodesOfEthics,
+  operatingSummary,
+  codeLabel,
+  selectDelineations,
+  delineationBrief,
+} from "./knowledge";
 
 /**
  * Per-pass model selection. Every pass defaults to Opus 4.8 (the "showcase"
@@ -66,6 +72,14 @@ export const MODELS = {
  * route and any caller that persists a `model` field.
  */
 export const READING_MODEL = MODELS.composition;
+
+/**
+ * Token ceiling for every pass that emits the full family-facing reading —
+ * the composition itself and the two rewrites (ethics, verification). Sized for
+ * the deepened section architecture (~1400–2000 words, ~10 sections, up to 13
+ * with a nativity) with headroom, so a rich reading is never truncated.
+ */
+const COMPOSITION_MAX_TOKENS = 6656;
 
 export interface PipelineArgs {
   fullName: string;
@@ -228,6 +242,8 @@ You have practiced for more than twenty years and specialize exclusively in char
 
 In this pass you COMPOSE. A colleague has already done the technical judgment and handed you a weighted dossier of testimonies with sources, directions, and themes. Trust it. Build the reading around the highest-weight testimonies and the primary themes, letting the concordant ones carry the spine of the piece. Do not introduce placements that are not in the dossier or the chart frame.
 
+You are also given an INTERPRETIVE REFERENCE: short traditional delineations for the factors actually present in this chart (the Moon's sign, the lunar phase, the mortal significators, the death-house complex, the Lots, the fixed stars in contact). This is the doctrine a practitioner carries in their head — draw on it for depth, texture, and the tradition behind each testimony. Synthesize it into your own tender prose; never quote it verbatim, never list it, and never let it introduce a factor the chart frame does not contain. Where the reference is silent on a factor the dossier weights highly, read that factor from your own craft.
+
 VOICE AND POSTURE
 - Warm, unhurried, dignified. Every sentence should feel safe to read at 3 a.m.
 - Never cold, clinical, or sensational. You do not predict, frighten, or moralize. You illuminate.
@@ -240,22 +256,30 @@ INTEGRITY
 - Weave technique into meaning — don't list "Moon in Scorpio, 8th house," say what the soul's vehicle passing through that water carries.
 - When houses/angles were absent, lean gracefully on signs, dignities, lots by sign, aspects, and the Moon; never fabricate an angle.
 
-STRUCTURE (Markdown; "## " for sections, "### " for sub-labels). ~800–1200 words:
+DEPTH — this reading must feel like an unhurried in-person session, not a summary. Give each major section TWO to FOUR substantial paragraphs; never settle for a single thin one. Lead with the whole and then descend into the particular. Weave the interpretive reference and the tradition into meaning; hold contradictions rather than flattening them; let concordant testimonies build. Earn the length with texture and tenderness, not with repetition or filler.
+
+STRUCTURE (Markdown; "## " for sections, "### " for sub-labels). ~1400–2000 words:
 
 ## The Threshold
-Two or three arresting sentences naming the person and the essential signature of their crossing.
+Two or three arresting sentences naming the person and the essential signature of their crossing. Set the whole reading's key here.
 
-## The Sky at the Crossing
-The whole-chart portrait — sect, dominant element/modality, chart shape, Moon phase — and what the shape of the whole says about this passing.
+## The Shape of the Whole
+The gestalt, read first: the chart shape, the hemispheric weighting, the dominant element and modality, the sect (day/night), and the Moon's phase. What does the *shape* of this entire sky say about the passing before any single placement is named? This is the overview a professional gives before the details.
 
 ## The Soul's Vehicle — Moon and the Luminaries
-The Moon (and Sun) by sign, dignity, and house/angle if present. The spiritual heart of the reading.
+The Moon (and Sun) by sign, dignity, and house/angle if present — the spiritual heart of the reading. The vessel that crossed, and its final condition. Let this be among the fullest sections.
+
+## The Ruling Hand
+The planet that governs this sky — the ruler of the Ascendant, or (when angles are absent) the almuten of the Ascendant degree or the chart's final dispositor — read as the hand that guided the passage. Where the chart offers no angle, lean gracefully on the dispositor or almuten by sign; never fabricate an Ascendant.
 
 ## Thresholds and Guardians
-The mortal significators and the 8th/4th/12th complex — Saturn, Pluto, the Nodes, the ruler of the 8th — and the death-lot(s), read as meaning.
+The mortal significators and the 8th/4th/12th complex — Saturn, Pluto, the Nodes, the ruler of the 8th, the 4th as the place of rest, the 12th as the hidden approach — and the death-lot(s), read as meaning and as guardianship, never as cause or manner.
+
+## The Karmic Axis
+The lunar Nodes: the South Node as what is laid down at the gate, the familiar released; the North Node as the direction the soul faced as it crossed. Include any planet conjunct the nodes. (Omit this section only if the chart frame shows no nodal testimony.)
 
 ## The Weave of Aspects
-The two or three most significant patterns/aspects (highest weight, tightest orb) as a living pattern, and any fixed-star contact that concurs.
+The two or three most significant patterns/aspects (highest weight, tightest orb) as a living pattern, and any fixed-star contact that concurs. Read the aspects as relationship, not geometry.
 
 ## Gifts Carried Forward
 What this soul leaves those who loved them — strengths, graces, the imprint of a life.
@@ -307,11 +331,15 @@ async function runComposition(
   brief: string,
   dossier: JudgmentDossier,
   hasNatal: boolean,
-  ethicalCovenant: string
+  ethicalCovenant: string,
+  reference: string
 ): Promise<string> {
+  const referenceBlock = reference.trim()
+    ? `INTERPRETIVE REFERENCE (traditional delineations for the factors present in this chart — synthesize for depth, never quote or list, never introduce a factor not in the frame)\n\`\`\`\n${reference.trim()}\n\`\`\`\n\n`
+    : "";
   const stream = client().messages.stream({
     model: MODELS.composition,
-    max_tokens: 4608,
+    max_tokens: COMPOSITION_MAX_TOKENS,
     system:
       COMPOSITION_SYSTEM +
       (hasNatal ? TIER2_ADDENDUM : "") +
@@ -323,6 +351,7 @@ async function runComposition(
           `SUBJECT\n${subjectLine(args)}\n\n` +
           `JUDGMENT DOSSIER (compose from this — it is authoritative)\n\`\`\`\n${dossierToText(dossier)}\n\`\`\`\n\n` +
           `CHART FRAME (for exact placements you may name)\n\`\`\`\n${brief}\n\`\`\`\n\n` +
+          referenceBlock +
           `Compose the reading now.`,
       },
     ],
@@ -405,7 +434,7 @@ async function runRevision(
 ): Promise<string> {
   const stream = client().messages.stream({
     model: MODELS.composition, // a rewrite of the reading — stays at composition grade
-    max_tokens: 4096,
+    max_tokens: COMPOSITION_MAX_TOKENS,
     system: REVISE_SYSTEM,
     messages: [
       {
@@ -563,7 +592,7 @@ You are revising an existing draft to resolve specific ETHICAL alignment notes f
 
   const stream = client().messages.stream({
     model: MODELS.composition, // an ethics rewrite of the reading — stays at composition grade
-    max_tokens: 4608,
+    max_tokens: COMPOSITION_MAX_TOKENS,
     system,
     messages: [
       {
@@ -697,6 +726,18 @@ export async function runReadingPipeline(args: PipelineArgs): Promise<PipelineRe
   const ethicsCodes = await getCodesOfEthics();
   const covenant = operatingSummary(ethicsCodes);
 
+  // Retrieve the interpretive reference: the delineations for the factors
+  // actually present in this chart, folded into the composition pass for depth.
+  // Keyed off the same deterministic analysis, loaded through the knowledge seam
+  // (Supabase override, bundled fallback), and degrades to nothing on failure.
+  let reference = "";
+  try {
+    const delineations = await selectDelineations(args.chart, analysis);
+    reference = delineationBrief(delineations);
+  } catch (err) {
+    console.error("[pipeline] delineation retrieval failed, composing without it:", err);
+  }
+
   // Pass A — Judgment. If it fails, the composer still gets the raw brief.
   let dossier: JudgmentDossier | null = null;
   try {
@@ -708,7 +749,7 @@ export async function runReadingPipeline(args: PipelineArgs): Promise<PipelineRe
   // Pass B — Composition (born aligned via the ethical covenant).
   const composeDossier: JudgmentDossier =
     dossier ?? { primary_themes: [], factors: [], suppressed_techniques: [], limits: "" };
-  let reading = await runComposition(args, brief, composeDossier, hasNatal, covenant);
+  let reading = await runComposition(args, brief, composeDossier, hasNatal, covenant, reference);
 
   // Pass E — Ethical Alignment. Audits the finished prose against the full
   // code(s) and revises once if materially misaligned. Runs before Pass C so the

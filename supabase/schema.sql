@@ -44,10 +44,16 @@ alter table public.readings add column if not exists study_notes jsonb;
 -- Knowledge corpus
 -- A general, versioned store of the practice's compiled reference material —
 -- the proprietary compilation of public data the reading engine draws on. The
--- Code of Ethics is the first `kind`; later phases add more kinds (association
--- standards, articles, webinar transcripts, published readings, case data) as
--- new ROWS, with no schema change. Kind-specific extras live in `metadata`, so
--- new kinds never force a migration.
+-- Code of Ethics is the first `kind` and the interpretive `delineation` corpus
+-- the second (its factor-keyed entries ride in `metadata.entries`); later phases
+-- add more kinds (association standards, articles, webinar transcripts,
+-- published readings, case data) as new ROWS, with no schema change.
+-- Kind-specific extras live in `metadata`, so new kinds never force a migration.
+--
+-- Both kinds ship BUNDLED in the app and fall back gracefully, so seeding here
+-- is optional — it just makes the corpus editable in the DB without a redeploy.
+-- A `delineation` row mirrors the bundled shape: kind = 'delineation', with
+-- metadata = '{"entries": [{"key":"moon:Scorpio","family":"moon", …}, …]}'.
 -- ─────────────────────────────────────────────────────────────
 
 create table if not exists public.knowledge_documents (

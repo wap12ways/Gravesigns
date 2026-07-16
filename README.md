@@ -46,7 +46,9 @@ POST /api/readings
                 complex, mortal significators; + lifespan & cross-aspects if natal
         Pass A  Judgment      — Claude distils a weighted, sourced dossier (JSON)
         Pass B  Composition   — Claude composes the reading (born aligned to a
-                                short ethical covenant loaded from the corpus)
+                                short ethical covenant, and deepened by the
+                                interpretive delineations retrieved for the
+                                factors present in this chart)
         Pass E  Ethical Alignment — Claude audits the prose against the loaded
                                 Code(s) of Ethics; one revision if misaligned
         Pass C  Verification  — Claude audits it; one revision if it fails
@@ -97,10 +99,11 @@ src/
     │   ├── lifespan.ts / synastry.ts   # natal (Tier-2) doctrine
     │   ├── serialize.ts           # analysis → evidence brief
     │   └── index.ts               # computeChartAnalysis()
-    ├── knowledge/                 # the reference corpus (ethics + future kinds)
-    │   ├── index.ts               # loadKnowledge() — Supabase w/ bundled fallback
+    ├── knowledge/                 # the reference corpus (ethics + delineations)
+    │   ├── index.ts               # loadKnowledge() + selectDelineations() — Supabase w/ bundled fallback
     │   └── documents/
-    │       └── ncgr-code-of-ethics.ts   # bundled, verbatim NCGR code
+    │       ├── ncgr-code-of-ethics.ts   # bundled, verbatim NCGR code
+    │       └── death-delineations.ts    # factor-keyed interpretive corpus (Moon-by-sign, significators, …)
     ├── glyphs.ts                  # shared glyphs + element palette
     ├── supabase.ts                # persistence (graceful demo fallback)
     ├── markdown.ts                # tiny, safe MD → HTML
@@ -165,6 +168,38 @@ the full code and revises it once if it is materially misaligned. Its verdict
 `ethics_review`. To retune what the engine aligns against, edit the
 `knowledge_documents` row (no deploy) or the bundled file — the text is loaded
 as data, never hardcoded into a prompt.
+
+### The delineation corpus & retrieval
+
+The corpus's second kind, **`delineation`**, is the practice's compiled
+*interpretive* reference — short, source-grounded readings of each chart factor
+(the Moon by sign, the lunar phase, the sect, the elemental cast, the chart
+shape, the mortal significators, the 8th/4th/12th complex, the Lots, and the
+death-salient fixed stars). It answers a different need than the astronomy: the
+deterministic engine tells the composer **what** is in the sky, and the
+delineation corpus tells it **what the tradition makes of it** — the doctrine a
+practitioner carries from years with the texts. Without it, each factor got a
+single thin sentence; with it, the composer has real depth to draw on.
+
+Retrieval is **targeted, not a dump.** Each entry carries a `key`
+(`moon:Scorpio`, `phase:Full Moon`, `significator:Saturn`, `house:8`,
+`lot:Lot of Death`, `star:Algol`, …). `selectDelineations(chart, analysis)`
+derives the keys **actually present** in a given chart from the same
+deterministic analysis the visuals use, matches them against the corpus, ranks
+so the interpretive spine (Moon, phase, significators, the death houses) leads,
+caps the set, and folds only those entries into the composition pass. So a
+water-sign, full-Moon, Saturn-weighted crossing pulls exactly the delineations
+that bear on it and nothing else.
+
+Every bundled entry is written **originally** for GraveSigns; where it cites a
+source it points to the **public-domain** tradition (Ptolemy, Valens, Dorotheus,
+Firmicus, Lilly) as a study trail — no copyrighted modern text is reproduced. It
+ships bundled (so it works in demo mode with no database) and, like the ethics
+code, can be **overridden or extended from Supabase** by adding
+`knowledge_documents` rows of kind `delineation` whose `metadata.entries` array
+holds more `{key, family, title, body, source}` entries — no code change. That
+is also the seam through which larger sources (public-domain classical texts,
+association standards) would be ingested and stored.
 
 ## ✦ Deploy to Vercel
 
