@@ -1,267 +1,237 @@
-<div align="center">
+# Alpha Estimate
 
-# GraveSigns
+OregonBuys bid intelligence and estimating for **Alpha Environmental Services LLC**.
 
-### Death Chart Readings — a practice within the Truestherb platform
+The app watches public solicitations on [OregonBuys](https://oregonbuys.gov/bso/),
+scores them for fit against Alpha's trade profile, pulls the scope out of the bid
+documents with Claude, and turns that scope into a priced estimate package ready
+for review.
 
-Compassionate, astrologer-grade readings of the sky at the moment a soul
-crosses — for people and beloved pets alike.
+Alpha is both a testing/consulting practice and a licensed contractor
+(Oregon CCB 152125), so the scoring treats a survey or air-monitoring contract
+as just as good a fit as a remediation job. Published services: asbestos
+abatement and testing; mold removal, testing and inspections; radon testing and
+mitigation; underground storage tank scanning, decommissioning, septic and soil
+testing; sewer inspections, trenchless repair and line cleaning.
 
-</div>
+It is a private operator tool. One password, no user accounts.
 
 ---
 
-GraveSigns casts a **true death chart** for the moment of passing (real
-planetary positions, aspects, houses, and lunar phase from a high-precision
-ephemeris) and composes a sophisticated, tender reading with **Claude** —
-written in the voice of a practitioner who has spent 20+ years with charts of
-transition.
+## Stack
 
-## ✦ Tech stack
+| Piece | Choice |
+| --- | --- |
+| App | Next.js 15 (App Router, TypeScript) on Vercel |
+| Data | Supabase Postgres — service role key, server side only |
+| Files | Supabase Storage, private `bid-documents` bucket |
+| AI | Anthropic API. Model ids live in `src/config/models.ts` |
+| Schedule | Vercel Cron, every 4 hours |
+| Styling | Tailwind. No component library |
 
-- **Next.js 15** (App Router) + **TypeScript**
-- **Tailwind CSS** + **shadcn/ui**-style components
-- **Supabase** (Postgres) for storing readings
-- **Anthropic Claude** for reading generation — five passes, each on a model you
-  choose (defaults to `claude-opus-4-8` everywhere; per-pass overridable)
-- **Swiss Ephemeris** via **sweph-wasm** — the astrologer's gold-standard ephemeris (full DE431 `.se1` data files), compiled to WebAssembly, no native deps
-- Proper **time-zone resolution** (`tz-lookup` + `luxon`) with DST/historical rules
-- Premium form UX: a **searchable time-zone combobox** with live GMT-offset badges and a **place autocomplete** that pins exact coordinates
-- **Vercel**-ready
+---
 
-## ✦ How it works
+## Setup
 
-```
-Form (name, date, optional time/place, optional birth details, human|pet, notes)
-        │
-        ▼
-POST /api/readings
-   1. Geocode place(s) (keyless Open-Meteo) when a time is also given
-   2. computeDeathChart()      ──►  real positions, houses, aspects, Moon phase,
-                                    sect, cusps, speeds  (Swiss Ephemeris DE431)
-   3. [optional] natal chart from birth details
-   4. runReadingPipeline():
-        Step 0  computeChartAnalysis()  — deterministic: dignities, Arabic lots,
-                aspect patterns, chart shape, fixed stars, the 8th/4th/12th
-                complex, mortal significators; + lifespan & cross-aspects if natal
-        Pass A  Judgment      — Claude distils a weighted, sourced dossier (JSON)
-        Pass B  Composition   — Claude composes the reading (born aligned to a
-                                short ethical covenant loaded from the corpus)
-        Pass E  Ethical Alignment — Claude audits the prose against the loaded
-                                Code(s) of Ethics; one revision if misaligned
-        Pass C  Verification  — Claude audits it; one revision if it fails
-        Pass N  Study Notes   — Claude keeps the practitioner's working notebook
-                                on the chart (craft, research threads, limits)
-   5. saveReading()            ──►  Supabase (no-op in demo mode)
-        │
-        ▼
-Interactive chart wheel + tables + the composed reading + the astrologer's casebook
+### 1. Supabase
+
+Create a project, then in **SQL Editor** run, in order:
+
+1. `supabase/migrations/0001_init.sql` — tables, indexes, RLS lockdown, and the
+   private `bid-documents` storage bucket.
+2. `supabase/seed/unit_prices.sql` — 112 placeholder unit prices across ten
+   categories: asbestos, mold, radon, sewer, tank, testing, lead, demo, hazmat
+   and general conditions.
+
+> Every rate in the seed is a **placeholder** with Portland-market-plausible
+> numbers, flagged `PLACEHOLDER` in its `notes`. Replace them from `/prices`
+> before quoting real work. Re-running the seed refreshes untouched placeholders
+> and leaves anything you have edited alone.
+
+Copy the project URL and the **service role** key from
+*Project Settings → API Keys*.
+
+### 2. Environment
+
+```bash
+cp .env.example .env.local
+# then fill in the values
 ```
 
-Only a **name** and **date of death** are required. Supplying a **time** and
-**place** together unlocks the Ascendant, Midheaven, and house placements.
-Supplying **birth details** casts the nativity too and adds the traditional
-length-of-life reading, the death-moment cross-aspects, and a bi-wheel.
+| Variable | What it is |
+| --- | --- |
+| `SUPABASE_URL` | `https://<ref>.supabase.co` |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key. **Server only** — never `NEXT_PUBLIC_` |
+| `ANTHROPIC_API_KEY` | From console.anthropic.com |
+| `CRON_SECRET` | Bearer token the cron route requires. `openssl rand -hex 32` |
+| `APP_PASSWORD` | The single password for the whole app |
+| `SESSION_SECRET` | Signs the login cookie. `openssl rand -hex 32` |
 
-## ✦ Project structure
+### 3. Run
+
+```bash
+npm install
+npm run dev      # http://localhost:3000
+```
+
+You will land on `/login`. Enter `APP_PASSWORD`.
+
+### 4. Deploy
+
+Import the repo in Vercel, set the same six variables under
+*Settings → Environment Variables*, deploy. `vercel.json` registers a daily
+cron against `/api/cron/scrape`; Vercel supplies the
+`Authorization: Bearer $CRON_SECRET` header automatically.
+
+#### Running on the free (Hobby) plan
+
+Two Hobby limits shape the setup. Neither costs the app anything real:
+
+| Limit | Effect | What we do |
+| --- | --- | --- |
+| **Cron runs once per day, max** | A `0 */4 * * *` expression **fails the deployment** with *"Hobby accounts are limited to daily cron jobs"* | `vercel.json` schedules daily, and something else pokes the endpoint every 4 hours — see below |
+| **Cron timing is ±59 minutes** | A job set for 13:00 fires somewhere in the 13:00 hour | Irrelevant — bids close on dates, not minutes |
+
+Function `maxDuration` is **not** a problem: Hobby allows the full 300 s, which
+is what every long route here declares.
+
+##### Getting the 4-hourly sweep back, free
+
+Two ways. Pick one — running both is harmless but pointless.
+
+**Supabase (recommended).** You already pay nothing for it and it needs no new
+account. Enable the `pg_cron` and `pg_net` extensions under
+*Database → Extensions*, then edit the two placeholders in
+`supabase/scheduled_scrape.sql` and run it. That file also contains the queries
+for checking the schedule fired.
+
+**GitHub Actions.** `.github/workflows/scrape.yml` does the same thing on the
+same schedule. Add two repository secrets under
+*Settings → Secrets and variables → Actions* — `APP_URL`
+(`https://your-project.vercel.app`, no trailing slash) and `CRON_SECRET`, the
+same value you set in Vercel. The workflow skips silently if either is
+missing, so it stays green when unused. It needs Actions to be enabled and in
+good standing on the account, which is why Supabase is the better default.
+
+Either way, **Run scraper** on `/admin` triggers a sweep by hand whenever you
+want one.
+
+#### If Vercel refuses the deployment
+
+Hobby projects only build commits from a GitHub account linked to the Vercel
+account that owns the project. A *"they're not a member of the team"* email
+means that link is missing. Three fixes, cheapest first:
+
+1. Link the GitHub account in Vercel under
+   *Account Settings → Authentication → GitHub*. Free, and the right fix.
+2. Make the repository public. Vercel builds public repos on Hobby regardless
+   of who pushed. Nothing in this repo is sensitive — `.env.local` is
+   gitignored and `.env.example` holds only placeholders — but check before
+   you flip it.
+3. Upgrade to Pro and add the account as a collaborator. Costs money; the
+   other two do not.
+
+---
+
+## Layout
 
 ```
 src/
-├── app/
-│   ├── layout.tsx                 # shell, fonts, header/footer
-│   ├── page.tsx                   # landing hero + reading form
-│   ├── globals.css                # dark/luxury theme tokens
-│   ├── readings/
-│   │   ├── page.tsx               # "Previous Readings" gallery (demo mode)
-│   │   └── [id]/page.tsx          # a single saved reading
-│   └── api/readings/
-│       ├── route.ts               # POST (create) + GET (list)
-│       └── [id]/route.ts          # GET one reading
-├── components/
-│   ├── reading-form.tsx           # the interactive form (client)
-│   ├── reading-display.tsx        # chart panel + reading + casebook
-│   ├── chart/                     # the visual layer
-│   │   ├── chart-panel.tsx        # tabbed orchestrator (client)
-│   │   ├── chart-wheel.tsx        # SVG wheel + bi-wheel
-│   │   ├── dignities-table.tsx / aspectarian.tsx / mortality-panel.tsx
-│   │   ├── moon-phase.tsx / dossier-notes.tsx / study-notes.tsx
-│   ├── logo.tsx / starfield.tsx / site-header.tsx
-│   └── ui/                        # button, input, textarea, label, card
-└── lib/
-    ├── astrology.ts               # ephemeris → DeathChart
-    ├── pipeline.ts                # the reading pipeline (judgment→compose→ethics→verify→notes)
-    ├── analysis/                  # Step-0 deterministic engine
-    │   ├── reference.ts           # source-verified traditional tables
-    │   ├── dignities.ts / lots.ts / patterns.ts / fixedstars.ts
-    │   ├── deathfactors.ts        # 8th/4th/12th complex, significators
-    │   ├── lifespan.ts / synastry.ts   # natal (Tier-2) doctrine
-    │   ├── serialize.ts           # analysis → evidence brief
-    │   └── index.ts               # computeChartAnalysis()
-    ├── knowledge/                 # the reference corpus (ethics + future kinds)
-    │   ├── index.ts               # loadKnowledge() — Supabase w/ bundled fallback
-    │   └── documents/
-    │       └── ncgr-code-of-ethics.ts   # bundled, verbatim NCGR code
-    ├── glyphs.ts                  # shared glyphs + element palette
-    ├── supabase.ts                # persistence (graceful demo fallback)
-    ├── markdown.ts                # tiny, safe MD → HTML
-    └── types.ts
-supabase/schema.sql               # readings + knowledge_documents tables + RLS
-supabase/seed/knowledge_documents.sql  # seeds the corpus (NCGR code of ethics)
-.env.example                      # environment variables
+  config/
+    company.ts     Alpha's identity, contractor profile, estimate defaults
+    models.ts      every Claude model id, one place
+    filters.ts     scraper keyword + NIGP prefilter
+  prompts/         the Claude prompts, as editable .md — no code inside
+  lib/
+    supabase.ts    the one service-role client
+    claude.ts      the one Anthropic wrapper: retries, schema validation, token log
+    auth.ts        password-gate cookie signing
+    money.ts       all estimate arithmetic
+    oregonbuys/    fetching and parsing OregonBuys
+  app/
+    login/         password gate
+    (app)/         everything behind the gate
+    api/           route handlers
+supabase/
+  migrations/      schema
+  seed/            placeholder unit prices
 ```
 
-## ✦ Run locally
+### The contractor profile is the most consequential file
 
-```bash
-# 1. Install
-npm install
+`src/config/company.ts` holds `CONTRACTOR_PROFILE`, the text every fit score is
+measured against. It is split three ways on purpose:
 
-# 2. Configure environment
-cp .env.example .env.local
-#   → set ANTHROPIC_API_KEY (required)
-#   → optionally set the Supabase keys to enable saving
+- **Self-performed** — Alpha's published services. These can score a straight
+  `bid`.
+- **Adjacent** — lead abatement, selective demolition, general hazmat, industrial
+  hygiene. Plausible for a CCB-licensed environmental firm but *not advertised*,
+  so the prompt routes them to `review` and a human decides.
+- **Not a fit** — `no_bid` regardless of score.
 
-# 3. Dev server
-npm run dev
-# open http://localhost:3000
-```
+Move a service between those three lists and every subsequent score changes.
+That is the intended way to tune the tool.
 
-> **Demo mode:** without Supabase, everything works end-to-end — readings are
-> calculated and composed — they just aren't stored, and the "Previous
-> Readings" gallery shows a connect prompt.
+### Things worth knowing
 
-## ✦ Set up Supabase (optional)
-
-1. Create a project at [supabase.com](https://supabase.com).
-2. Open **SQL Editor** and run [`supabase/schema.sql`](supabase/schema.sql).
-3. Run [`supabase/seed/knowledge_documents.sql`](supabase/seed/knowledge_documents.sql)
-   to seed the knowledge corpus (the NCGR Code of Ethics). Optional — the app
-   ships with a bundled copy and falls back to it, but seeding makes the code
-   editable in the database without a redeploy.
-4. From **Project Settings → API**, copy into `.env.local`:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `SUPABASE_SERVICE_ROLE_KEY` (server-only — never expose to the browser)
-
-The API routes write with the service-role key, so inserts succeed with RLS on.
-A public **read** policy is included so the gallery renders; tighten it for
-production.
-
-### The knowledge corpus & the ethical-alignment pass
-
-`knowledge_documents` is a general, versioned store of the practice's compiled
-reference material — the Code of Ethics is its first `kind`; later kinds
-(association standards, articles, webinar transcripts, published readings, case
-data) are added as **rows**, with no schema or code change. The reading engine
-reads it through one seam, [`src/lib/knowledge`](src/lib/knowledge), which loads
-active documents from Supabase and **falls back to the bundled copies** when the
-DB is unconfigured, empty, or lagging the schema — so a reading is never blocked.
-
-The reading pipeline consults it twice: a short **operating summary** of the
-code is folded into the composition pass so drafts are born aligned, and a
-dedicated **Pass E — Ethical Alignment** then audits the finished prose against
-the full code and revises it once if it is materially misaligned. Its verdict
-(which clauses were engaged, what was adjusted) is persisted on the reading as
-`ethics_review`. To retune what the engine aligns against, edit the
-`knowledge_documents` row (no deploy) or the bundled file — the text is loaded
-as data, never hardcoded into a prompt.
-
-## ✦ Deploy to Vercel
-
-1. Push this repo to GitHub.
-2. Import it at [vercel.com/new](https://vercel.com/new) (Next.js is
-   auto-detected).
-3. Add the environment variables from `.env.example` in the Vercel project
-   settings.
-4. Deploy.
-
-The reading route requests a 300s `maxDuration` (honoured up to your Vercel
-plan's ceiling — 300s on Pro, capped to 60s on Hobby) because it runs three
-sequential Claude passes. It runs on the **Node.js runtime** (required by the
-ephemeris and the Anthropic SDK) and streams each pass to avoid HTTP timeouts.
-
-## ✦ Customizing the reading voice
-
-The astrologer personas live in [`src/lib/pipeline.ts`](src/lib/pipeline.ts):
-`JUDGMENT_SYSTEM` (what evidence to weigh), `COMPOSITION_SYSTEM` (voice,
-integrity, and the section shape of every reading), `ETHICS_SYSTEM` (the
-ethical-alignment audit), `VERIFY_SYSTEM` (the integrity audit), and
-`STUDY_NOTES_SYSTEM` (the practitioner's notebook). Edit them there to retune
-the craft. The deterministic astrology it all builds on lives in
-[`src/lib/analysis/`](src/lib/analysis).
-
-### Choosing a model per pass
-
-Each of the five passes picks its model from `MODELS` in
-[`src/lib/pipeline.ts`](src/lib/pipeline.ts), and every pass is independently
-overridable by environment variable — so the pipeline can be tiered for cost or
-latency without a code change. All passes default to **`claude-opus-4-8`**;
-`ANTHROPIC_MODEL` sets the default for all at once, and the per-pass vars
-(`ANTHROPIC_MODEL_JUDGMENT`, `…_COMPOSITION`, `…_ETHICS`, `…_VERIFICATION`,
-`…_STUDY_NOTES`) override individual passes. The ethics and verification
-**rewrites** always run on the composition model, so the finished reading stays
-at composition grade no matter how cheaply the audits are tiered. See
-[`.env.example`](.env.example) for a ready cost-tiered profile.
-
-## ✦ On the astronomy
-
-Charts are cast with the **Swiss Ephemeris** — the same library professional
-astrologers rely on — via `sweph-wasm`, a WebAssembly build. It runs in **full
-Swiss mode** (`SEFLG_SWIEPH`) against the **JPL-DE431-derived `.se1` data
-files**, the authoritative, sub-arcsecond source. The two files covering
-1800–2400 AD (main planets incl. Pluto + Moon, ~1.8 MB) ship with the package;
-at startup we load their bytes directly into the Emscripten in-memory
-filesystem and point Swiss Ephemeris at them — so there is **no runtime CDN
-fetch and no native compilation**.
-
-Positions are true geocentric apparent longitudes in the tropical zodiac of
-date. Houses are **Placidus** (whole-sign fallback at extreme latitudes)
-computed from the Swiss `swe_houses` Ascendant/Midheaven.
-
-**Time zones are resolved properly**, so the Ascendant and houses are accurate:
-the geocoded coordinates are mapped to their civil IANA zone (`tz-lookup`), and
-the local time of death is converted to UTC with `luxon`, applying daylight
-saving and historical zone rules from the IANA database — no external service.
-The resolved zone is recorded on the chart (`chart.timezone`) and shown in the
-UI. (For border-exact zone resolution, `geo-tz` can replace `tz-lookup`.)
-
-Auto-detection is the default, but the form offers an **optional time-zone
-override** (shown once a time of death is entered, defaulting to "Detect from
-place") for ambiguous places or when the family knows the zone better than the
-geocoder. A supplied zone is validated and takes precedence over the lookup;
-it even works with no place at all, yielding an accurate UTC instant (and so
-accurate planetary and Moon positions) without houses. If the data files
-can't be loaded, or a date falls outside their range, the engine falls back —
-per body — to Swiss Ephemeris's built-in analytical **Moshier** model (still
-arcsecond-accurate), so a reading is always produced. The chart records which
-source was used (`chart.ephemeris`), shown in the UI and passed to the reading.
-
-The WASM module is instantiated from its binary bytes (read via `fs`), which
-sidesteps the Emscripten `fetch` loader that doesn't work under Node. Three Next
-settings make this production-safe (see `next.config.mjs`): `sweph-wasm` is a
-`serverExternalPackage`, and `outputFileTracingIncludes` bundles the `.wasm`
-binary **and the two `.se1` files** into the serverless function (the full
-multi-hundred-MB ephemeris set is not shipped).
-
-### Widening the date range or adding bodies
-
-The bundled `sepl_18.se1` / `semo_18.se1` cover 1800–2400 AD and every body this
-app computes. For dates outside that range or additional points (asteroids,
-fixed stars), add the relevant `.se1` files — they're under
-`node_modules/sweph-wasm/dist/ephe/`, or from
-[astro.com/ftp/swisseph/ephe](https://www.astro.com/ftp/swisseph/ephe/) — to
-both `EPHE_FILES` in [`src/lib/astrology.ts`](src/lib/astrology.ts) and
-`outputFileTracingIncludes` in `next.config.mjs`. That file is the single seam;
-the rest of the app is unchanged.
-
-## ✦ The logo
-
-A crisp SVG brand mark ships in `src/components/logo.tsx`. To use the exact
-supplied artwork, save it as `public/logo.png` — see
-[`public/README.md`](public/README.md).
+- **The model never does arithmetic.** Claude proposes line items and
+  quantities; `src/lib/money.ts` computes every subtotal, markup, contingency
+  and total.
+- **Prompts are data.** `src/prompts/*.md` are read from disk at request time.
+  Edit one, reload the page, and the next call uses it.
+- **Nothing secret reaches the browser.** The service role key and the Anthropic
+  key are read only inside route handlers and server components.
+- **We are a polite scraper.** One page every 2 seconds, a descriptive user
+  agent, and a file already in Storage is never downloaded twice.
 
 ---
 
-<div align="center">
-<sub>Offered as contemplative comfort. Not a substitute for medical, legal, or grief-care services.</sub>
-</div>
+## OregonBuys, as it actually behaves
+
+Worth writing down, because it drove the design:
+
+- The open-bids list at
+  `/bso/view/search/external/advancedSearchBid.xhtml?openBids=true` renders
+  **25 rows server-side on a plain GET**. No ViewState needed.
+- Bid detail pages (`/bso/external/bidDetail.sda?docId=…&external=true`) are
+  plain GETs and carry everything we need: bid number, title, agency, buyer name
+  and email, close date, NIGP codes, location, pre-bid conference, attachments.
+- Attachments download over a plain GET
+  (`…&mode=download&downloadFileNbr=<n>`) with a correct
+  `Content-Disposition` filename.
+- **Pagination is the one blocked path.** The PrimeFaces paginator postback
+  returns `403` from the WAF even with a live ViewState, session cookie and
+  browser headers. So the cron scrape covers page 1 (the newest 25 open bids),
+  which every 4 hours is comfortably more than OregonBuys posts. Anything that
+  slips past gets caught by **manual import by URL** on `/admin`.
+
+If Alpha ever needs a full sweep of all open bids, the list fetcher sits behind
+a small `ListStrategy` interface, so a Playwright-driven strategy can be dropped
+in without touching the rest of the pipeline.
+
+### The scrape_seen ledger
+
+Only page one is readable, so most open bids are absent from any given run —
+which means "it fell off the list" is *not* evidence a bid closed. Bids are
+closed on their opening date instead.
+
+And because the list row only carries a terse title, deciding whether a bid is
+ours needs its detail page. Fetching all 25 every four hours just to re-reject
+the same ones is rude and slow, so `scrape_seen` keeps a bid-number ledger:
+bid number, docId, and whether it matched. A bid we have already looked at and
+rejected is not looked at again. Nothing else about it is stored.
+
+---
+
+## Handy scripts
+
+No database or API keys needed for the first two:
+
+```bash
+npx tsx scripts/probe-bid.ts S-435000-00017903   # fetch + parse one bid, print everything
+npx tsx scripts/probe-list.ts                    # page 1 of open bids, showing keyword hits
+npx tsx scripts/run-scrape.ts                    # a full scrape run (needs Supabase)
+```
+
+`probe-bid.ts` is the fastest way to check a parser change against the live
+site. It also takes `--file ./saved.html --doc-id S-1-2` to work offline.

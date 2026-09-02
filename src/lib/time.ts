@@ -1,66 +1,94 @@
 /**
- * Resolve a local date + time of death (at a place) to a precise UTC instant.
+ * OregonBuys prints every date in Pacific time with no zone marker, e.g.
+ * "09/23/2026 02:00:00 PM". These helpers turn that into a real instant.
  *
- * This is the piece that makes the Ascendant and houses trustworthy: given the
- * geocoded latitude/longitude we look up the civil IANA time zone (`tz-lookup`)
- * and convert the local wall-clock time on that historical date to UTC with
- * `luxon`, which applies daylight-saving and historical zone rules from the
- * IANA database. No external service, no account — the same approach desktop
- * astrology software uses. (For border-exact zone resolution, `geo-tz` could
- * replace `tz-lookup`; the coarser lookup is more than adequate at city level.)
+ * No date library: Intl already knows the DST rules, so we ask it what the
+ * Pacific offset is on the date in question and apply it.
  */
-import tzlookup from "tz-lookup";
-import { DateTime } from "luxon";
 
-export interface DeathMoment {
-  /** The resolved UTC instant of the chart */
-  date: Date;
-  /** Whether a real time-of-death (not the noon fallback) was supplied */
-  timeKnown: boolean;
-  /** The IANA time zone used, when a location was available */
-  timezone: string | null;
+const OREGON_TZ = "America/Los_Angeles";
+
+/** Offset in minutes that `America/Los_Angeles` is behind UTC at `utcGuess`. */
+function pacificOffsetMinutes(utcGuess: Date): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: OREGON_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(utcGuess);
+
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value);
+  const asUtc = Date.UTC(
+    get("year"),
+    get("month") - 1,
+    get("day"),
+    get("hour") % 24,
+    get("minute"),
+    get("second"),
+  );
+  return (utcGuess.getTime() - asUtc) / 60_000;
 }
 
-export function resolveDeathMoment(
-  dateOfDeath: string,
-  timeOfDeath: string | null | undefined,
-  latitude: number | null | undefined,
-  longitude: number | null | undefined,
-  /** Explicit IANA zone override; when set it wins over the geocoded lookup. */
-  timezoneOverride?: string | null
-): DeathMoment {
-  const [y, m, d] = dateOfDeath.split("-").map(Number);
-  const timeKnown = Boolean(timeOfDeath && /^\d{1,2}:\d{2}$/.test(timeOfDeath));
-  const [hh, mm] = timeKnown
-    ? (timeOfDeath as string).split(":").map(Number)
-    : [12, 0];
+/**
+ * Parse "MM/DD/YYYY", "MM/DD/YYYY hh:mm:ss AM" or "MM/DD/YYYY HH:mm:ss"
+ * as Pacific time. Returns an ISO string, or null if it does not look like
+ * a date at all.
+ */
+export function parseOregonDate(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const text = raw.replace(/ /g, " ").trim();
 
-  // Zone precedence: an explicit user override, else the geocoded location.
-  let zone: string | null = null;
-  if (timezoneOverride) {
-    zone = timezoneOverride;
-  } else if (typeof latitude === "number" && typeof longitude === "number") {
-    try {
-      zone = tzlookup(latitude, longitude);
-    } catch {
-      zone = null;
-    }
+  const match = text.match(
+    /(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?)?/i,
+  );
+  if (!match) return null;
+
+  const [, mm, dd, yyyy, hh, mi, ss, meridiem] = match;
+  let hour = hh ? Number(hh) : 0;
+  if (meridiem) {
+    const upper = meridiem.toUpperCase();
+    if (upper === "PM" && hour < 12) hour += 12;
+    if (upper === "AM" && hour === 12) hour = 0;
   }
 
-  if (zone) {
-    const dt = DateTime.fromObject(
-      { year: y, month: m, day: d, hour: hh, minute: mm },
-      { zone }
-    );
-    if (dt.isValid) {
-      return { date: new Date(dt.toMillis()), timeKnown, timezone: zone };
-    }
-  }
+  // Treat the wall-clock reading as UTC, then correct by the Pacific offset.
+  // Two passes so a time that lands near a DST boundary still resolves.
+  const naive = Date.UTC(
+    Number(yyyy),
+    Number(mm) - 1,
+    Number(dd),
+    hour,
+    mi ? Number(mi) : 0,
+    ss ? Number(ss) : 0,
+  );
+  let instant = new Date(naive + pacificOffsetMinutes(new Date(naive)) * 60_000);
+  instant = new Date(naive + pacificOffsetMinutes(instant) * 60_000);
 
-  // No zone (or invalid): treat the supplied clock time as UTC.
-  return {
-    date: new Date(Date.UTC(y, m - 1, d, hh, mm, 0)),
-    timeKnown,
-    timezone: null,
-  };
+  return Number.isNaN(instant.getTime()) ? null : instant.toISOString();
+}
+
+/** Whole days from now until `iso`. Negative once it has passed. */
+export function daysUntil(iso: string | null | undefined): number | null {
+  if (!iso) return null;
+  const ms = new Date(iso).getTime() - Date.now();
+  if (Number.isNaN(ms)) return null;
+  return Math.ceil(ms / 86_400_000);
+}
+
+/** "Sep 23, 2026 2:00 PM" in Pacific time — how the buyer reads it. */
+export function formatPacific(iso: string | null | undefined, withTime = true): string {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "—";
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: OREGON_TZ,
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    ...(withTime ? { hour: "numeric", minute: "2-digit" } : {}),
+  }).format(date);
 }
