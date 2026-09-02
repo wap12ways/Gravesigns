@@ -42,12 +42,18 @@ export async function verifySessionToken(token: string | undefined): Promise<boo
   if (!expires || !mac) return false;
   if (Number(expires) < Date.now()) return false;
 
-  const expected = await sign(expires);
-  // Constant-time compare. Both are hex of the same length.
-  if (expected.length !== mac.length) return false;
-  let diff = 0;
-  for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ mac.charCodeAt(i);
-  return diff === 0;
+  try {
+    const expected = await sign(expires);
+    // Constant-time compare. Both are hex of the same length.
+    if (expected.length !== mac.length) return false;
+    let diff = 0;
+    for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ mac.charCodeAt(i);
+    return diff === 0;
+  } catch {
+    // This runs in middleware, on every request. An unset SESSION_SECRET must
+    // send the visitor to /login, not 500 the entire site.
+    return false;
+  }
 }
 
 export const SESSION_MAX_AGE = SESSION_DAYS * 24 * 60 * 60;
