@@ -36,6 +36,12 @@ export default async function PrintPage({
     .eq("id", estimate.solicitation_id)
     .maybeSingle<Solicitation>();
 
+  // Belt and braces: this page goes to a public agency buyer. An unfilled
+  // placeholder must never print, however it got into the config.
+  const printableLicenses = COMPANY.licenses.filter(
+    (line) => !/^\s*TODO\b|TODO:/i.test(line),
+  );
+
   const subtotal = Number(estimate.subtotal);
   const markup = round2((subtotal * Number(estimate.markup_pct)) / 100);
   const contingency = round2((subtotal * Number(estimate.contingency_pct)) / 100);
@@ -205,8 +211,8 @@ export default async function PrintPage({
         <div>
           {COMPANY.signer.email} · {COMPANY.signer.phone}
         </div>
-        {COMPANY.licenses.length > 0 && (
-          <div className="mt-3 text-[10px] text-slate-500">{COMPANY.licenses.join(" · ")}</div>
+        {printableLicenses.length > 0 && (
+          <div className="mt-3 text-[10px] text-slate-500">{printableLicenses.join(" · ")}</div>
         )}
       </footer>
     </div>
