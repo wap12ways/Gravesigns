@@ -5,7 +5,7 @@ export const runtime = "nodejs";
 export const maxDuration = 300;
 
 /**
- * The scheduled scrape. Registered in vercel.json to run every 4 hours.
+ * The scheduled scrape. Registered in vercel.json to run once a day.
  *
  * This route is outside the password gate (middleware exempts /api/cron), so
  * it authenticates on CRON_SECRET instead. Vercel sends it as a bearer token.

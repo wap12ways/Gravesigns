@@ -26,7 +26,7 @@ It is a private operator tool. One password, no user accounts.
 | Data | Supabase Postgres — service role key, server side only |
 | Files | Supabase Storage, private `bid-documents` bucket |
 | AI | Anthropic API. Model ids live in `src/config/models.ts` |
-| Schedule | Vercel Cron, every 4 hours |
+| Schedule | Vercel Cron, once a day |
 | Styling | Tailwind. No component library |
 
 ---
@@ -89,32 +89,21 @@ Two Hobby limits shape the setup. Neither costs the app anything real:
 
 | Limit | Effect | What we do |
 | --- | --- | --- |
-| **Cron runs once per day, max** | A `0 */4 * * *` expression **fails the deployment** with *"Hobby accounts are limited to daily cron jobs"* | `vercel.json` schedules daily, and something else pokes the endpoint every 4 hours — see below |
+| **Cron runs once per day, max** | A `0 */4 * * *` expression **fails the deployment** with *"Hobby accounts are limited to daily cron jobs"* | `vercel.json` schedules the sweep daily, which is all this needs |
 | **Cron timing is ±59 minutes** | A job set for 13:00 fires somewhere in the 13:00 hour | Irrelevant — bids close on dates, not minutes |
 
 Function `maxDuration` is **not** a problem: Hobby allows the full 300 s, which
 is what every long route here declares.
 
-##### Getting the 4-hourly sweep back, free
+##### If daily ever feels too slow
 
-Two ways. Pick one — running both is harmless but pointless.
+It probably will not — OregonBuys posts few enough bids that a daily catch is
+plenty, and `/admin` has a **Run scraper** button for when you want one now.
 
-**Supabase (recommended).** You already pay nothing for it and it needs no new
-account. Enable the `pg_cron` and `pg_net` extensions under
-*Database → Extensions*, then edit the two placeholders in
-`supabase/scheduled_scrape.sql` and run it. That file also contains the queries
-for checking the schedule fired.
-
-**GitHub Actions.** `.github/workflows/scrape.yml` does the same thing on the
-same schedule. Add two repository secrets under
-*Settings → Secrets and variables → Actions* — `APP_URL`
-(`https://your-project.vercel.app`, no trailing slash) and `CRON_SECRET`, the
-same value you set in Vercel. The workflow skips silently if either is
-missing, so it stays green when unused. It needs Actions to be enabled and in
-good standing on the account, which is why Supabase is the better default.
-
-Either way, **Run scraper** on `/admin` triggers a sweep by hand whenever you
-want one.
+If you do want more, `supabase/scheduled_scrape.sql` adds extra sweeps using
+`pg_cron` and `pg_net` on Supabase's free tier. Two extensions to enable, two
+placeholders to fill, no new account. Leave the daily Vercel cron in place
+alongside it — overlapping sweeps are harmless.
 
 #### If Vercel refuses the deployment
 
@@ -202,8 +191,8 @@ Worth writing down, because it drove the design:
 - **Pagination is the one blocked path.** The PrimeFaces paginator postback
   returns `403` from the WAF even with a live ViewState, session cookie and
   browser headers. So the cron scrape covers page 1 (the newest 25 open bids),
-  which every 4 hours is comfortably more than OregonBuys posts. Anything that
-  slips past gets caught by **manual import by URL** on `/admin`.
+  which is comfortably more than OregonBuys posts in a day. Anything that slips
+  past gets caught by **manual import by URL** on `/admin`.
 
 If Alpha ever needs a full sweep of all open bids, the list fetcher sits behind
 a small `ListStrategy` interface, so a Playwright-driven strategy can be dropped
@@ -216,7 +205,7 @@ which means "it fell off the list" is *not* evidence a bid closed. Bids are
 closed on their opening date instead.
 
 And because the list row only carries a terse title, deciding whether a bid is
-ours needs its detail page. Fetching all 25 every four hours just to re-reject
+ours needs its detail page. Re-fetching all 25 on every run just to re-reject
 the same ones is rude and slow, so `scrape_seen` keeps a bid-number ledger:
 bid number, docId, and whether it matched. A bid we have already looked at and
 rejected is not looked at again. Nothing else about it is stored.
