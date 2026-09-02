@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AnalysisPanel } from "@/components/analysis-panel";
+import { ActionButton } from "@/components/action-button";
+import { latestAnalysis } from "@/lib/analysis";
 import { db } from "@/lib/supabase";
 import { signedDocumentUrl } from "@/lib/oregonbuys/documents";
 import { daysUntil, formatPacific } from "@/lib/time";
-import type { Solicitation, SolicitationDocument } from "@/lib/types";
+import type { Solicitation, SolicitationAnalysis, SolicitationDocument } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +40,7 @@ export default async function SolicitationPage({
     })),
   );
 
+  const analysis = (await latestAnalysis(id)) as SolicitationAnalysis | null;
   const days = daysUntil(bid.close_at);
 
   return (
@@ -54,6 +58,12 @@ export default async function SolicitationPage({
                 Open on OregonBuys ↗
               </a>
             )}
+            <ActionButton
+              endpoint={`/api/solicitations/${bid.id}/analyze`}
+              label={analysis ? "Re-analyse" : "Analyse"}
+              busyLabel="Analysing…"
+              variant={analysis ? "ghost" : "primary"}
+            />
           </div>
         </div>
 
@@ -107,6 +117,15 @@ export default async function SolicitationPage({
           </div>
         )}
       </header>
+
+      {analysis ? (
+        <AnalysisPanel analysis={analysis} />
+      ) : (
+        <section className="card p-4 text-sm text-slate-600">
+          Not analysed yet. Press <strong>Analyse</strong> to score this bid and pull the
+          scope out of the documents.
+        </section>
+      )}
 
       <section className="card">
         <div className="card-title">Documents ({links.length})</div>
