@@ -142,6 +142,19 @@ create table if not exists scrape_runs (
 
 create index if not exists scrape_runs_started_idx on scrape_runs (started_at desc);
 
+-- ── scrape_seen ──────────────────────────────────────────────────────────────
+-- A bid-number ledger, nothing more. Without it, every 4-hourly run would
+-- re-fetch the detail page of all 25 listed bids just to re-reject the same
+-- ones. This is not mirroring the site: no title, no content, just "we have
+-- already looked at this bid and it was not ours".
+create table if not exists scrape_seen (
+  source_bid_number text primary key,
+  doc_id            text,
+  matched           boolean not null default false,
+  first_seen_at     timestamptz not null default now(),
+  last_seen_at      timestamptz not null default now()
+);
+
 -- ── claude_calls (token log) ─────────────────────────────────────────────────
 create table if not exists claude_calls (
   id             uuid primary key default gen_random_uuid(),
@@ -186,6 +199,7 @@ alter table solicitation_analysis  enable row level security;
 alter table unit_prices            enable row level security;
 alter table estimates              enable row level security;
 alter table scrape_runs            enable row level security;
+alter table scrape_seen            enable row level security;
 alter table claude_calls           enable row level security;
 
 -- ── storage bucket for bid attachments ───────────────────────────────────────

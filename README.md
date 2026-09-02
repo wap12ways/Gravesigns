@@ -133,6 +133,33 @@ Worth writing down, because it drove the design:
   which every 4 hours is comfortably more than OregonBuys posts. Anything that
   slips past gets caught by **manual import by URL** on `/admin`.
 
-If Alpha ever needs a full sweep of all open bids, the list fetcher is written
-behind a small interface so a Playwright-driven strategy can be dropped in
-without touching the rest of the pipeline.
+If Alpha ever needs a full sweep of all open bids, the list fetcher sits behind
+a small `ListStrategy` interface, so a Playwright-driven strategy can be dropped
+in without touching the rest of the pipeline.
+
+### The scrape_seen ledger
+
+Only page one is readable, so most open bids are absent from any given run —
+which means "it fell off the list" is *not* evidence a bid closed. Bids are
+closed on their opening date instead.
+
+And because the list row only carries a terse title, deciding whether a bid is
+ours needs its detail page. Fetching all 25 every four hours just to re-reject
+the same ones is rude and slow, so `scrape_seen` keeps a bid-number ledger:
+bid number, docId, and whether it matched. A bid we have already looked at and
+rejected is not looked at again. Nothing else about it is stored.
+
+---
+
+## Handy scripts
+
+No database or API keys needed for the first two:
+
+```bash
+npx tsx scripts/probe-bid.ts S-435000-00017903   # fetch + parse one bid, print everything
+npx tsx scripts/probe-list.ts                    # page 1 of open bids, showing keyword hits
+npx tsx scripts/run-scrape.ts                    # a full scrape run (needs Supabase)
+```
+
+`probe-bid.ts` is the fastest way to check a parser change against the live
+site. It also takes `--file ./saved.html --doc-id S-1-2` to work offline.
