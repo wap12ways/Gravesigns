@@ -39,7 +39,7 @@ export function RunScraperButton() {
         <p className="text-slate-600">
           Reads page one of the OregonBuys open-bid list — the newest 25 postings — keeps
           anything matching the keyword or NIGP filter, and downloads its attachments.
-          The same job runs on its own every 4 hours.
+          The same job runs on its own once a day, early morning Pacific.
         </p>
         <button onClick={run} disabled={busy} className="btn">
           {busy ? "Running…" : "Run scraper"}

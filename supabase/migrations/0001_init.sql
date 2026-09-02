@@ -144,10 +144,10 @@ create table if not exists scrape_runs (
 create index if not exists scrape_runs_started_idx on scrape_runs (started_at desc);
 
 -- ── scrape_seen ──────────────────────────────────────────────────────────────
--- A bid-number ledger, nothing more. Without it, every 4-hourly run would
--- re-fetch the detail page of all 25 listed bids just to re-reject the same
--- ones. This is not mirroring the site: no title, no content, just "we have
--- already looked at this bid and it was not ours".
+-- A bid-number ledger, nothing more. Without it, every run would re-fetch the
+-- detail page of all 25 listed bids just to re-reject the same ones. This is
+-- not mirroring the site: no title, no content, just "we have already looked
+-- at this bid and it was not ours".
 create table if not exists scrape_seen (
   source_bid_number text primary key,
   doc_id            text,

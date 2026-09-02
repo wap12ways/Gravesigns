@@ -1,21 +1,24 @@
 -- ─────────────────────────────────────────────────────────────────────────────
--- Four-hourly scrape, scheduled from Supabase.
+-- OPTIONAL: scrape more often than once a day.
 --
--- WHY THIS EXISTS
--- Vercel's Hobby plan runs cron once per day, and that is all. This drives the
--- same endpoint every four hours using pg_cron and pg_net, both included on
--- Supabase's free tier. No extra service, no extra account, nothing to pay.
+-- YOU PROBABLY DO NOT NEED THIS.
+-- The daily sweep in vercel.json runs with no setup at all, and OregonBuys
+-- posts few enough bids that a daily catch is plenty. /admin has a "Run
+-- scraper" button for when you want one immediately.
 --
--- Use this OR .github/workflows/scrape.yml, not both. The Supabase route is
--- the better one if GitHub Actions is unavailable to you.
+-- Reach for this only if daily starts feeling slow — a bid with a seven-day
+-- window is worth catching on day one, not day two. Vercel's Hobby plan will
+-- not schedule more than once a day, so the extra sweeps come from pg_cron
+-- and pg_net, both on Supabase's free tier. No new account, nothing to pay.
 --
 -- SETUP
 --   1. Dashboard → Database → Extensions: enable `pg_cron` and `pg_net`.
 --   2. Replace the two placeholders below.
 --   3. Run this file in the SQL editor.
 --
--- The daily cron in vercel.json can stay. A second sweep is harmless — the
--- scrape is idempotent, and scrape_seen means it re-fetches almost nothing.
+-- Leave the daily cron in vercel.json in place. Overlapping sweeps are
+-- harmless: the scrape is idempotent, and scrape_seen means a second run in
+-- the same day re-fetches almost nothing.
 -- ─────────────────────────────────────────────────────────────────────────────
 
 create extension if not exists pg_cron;
