@@ -46,35 +46,84 @@ const OREGON_COUNTIES = [
   "Wheeler", "Yamhill",
 ];
 
-/** Cities common enough in Oregon solicitations to be worth mapping. */
+/**
+ * Oregon city → county, keyed lowercase.
+ *
+ * Only consulted against a city parsed out of a "City, OR 97005" address line,
+ * never scanned loosely over the page — otherwise "Adams" in a buyer's name
+ * would put a Beaverton job in Umatilla County.
+ */
 const CITY_TO_COUNTY: Record<string, string> = {
-  portland: "Multnomah",
-  gresham: "Multnomah",
-  "lake oswego": "Clackamas",
-  "oregon city": "Clackamas",
-  milwaukie: "Clackamas",
-  beaverton: "Washington",
-  hillsboro: "Washington",
-  tigard: "Washington",
-  tualatin: "Washington",
-  salem: "Marion",
-  keizer: "Marion",
-  eugene: "Lane",
-  springfield: "Lane",
-  corvallis: "Benton",
-  albany: "Linn",
-  bend: "Deschutes",
-  medford: "Jackson",
-  "the dalles": "Wasco",
-  astoria: "Clatsop",
-  "coos bay": "Coos",
-  roseburg: "Douglas",
-  pendleton: "Umatilla",
-  ontario: "Malheur",
-  "klamath falls": "Klamath",
-  newport: "Lincoln",
-  mcminnville: "Yamhill",
-  "forest grove": "Washington",
+  // Multnomah
+  portland: "Multnomah", gresham: "Multnomah", troutdale: "Multnomah",
+  fairview: "Multnomah", "wood village": "Multnomah",
+  // Washington
+  beaverton: "Washington", hillsboro: "Washington", tigard: "Washington",
+  tualatin: "Washington", "forest grove": "Washington", sherwood: "Washington",
+  cornelius: "Washington", "north plains": "Washington", banks: "Washington",
+  gaston: "Washington", durham: "Washington", "king city": "Washington",
+  // Clackamas
+  "oregon city": "Clackamas", "lake oswego": "Clackamas", milwaukie: "Clackamas",
+  "west linn": "Clackamas", gladstone: "Clackamas", canby: "Clackamas",
+  molalla: "Clackamas", estacada: "Clackamas", sandy: "Clackamas",
+  "happy valley": "Clackamas", wilsonville: "Clackamas",
+  // Marion
+  salem: "Marion", keizer: "Marion", woodburn: "Marion", silverton: "Marion",
+  stayton: "Marion", "mount angel": "Marion", aumsville: "Marion",
+  gervais: "Marion", hubbard: "Marion", turner: "Marion", sublimity: "Marion",
+  // Polk
+  dallas: "Polk", independence: "Polk", monmouth: "Polk",
+  // Yamhill
+  mcminnville: "Yamhill", newberg: "Yamhill", dundee: "Yamhill",
+  carlton: "Yamhill", lafayette: "Yamhill", sheridan: "Yamhill", amity: "Yamhill",
+  // Linn / Benton
+  albany: "Linn", lebanon: "Linn", "sweet home": "Linn", harrisburg: "Linn",
+  brownsville: "Linn", corvallis: "Benton", philomath: "Benton",
+  // Lane
+  eugene: "Lane", springfield: "Lane", "cottage grove": "Lane",
+  florence: "Lane", "junction city": "Lane", veneta: "Lane",
+  creswell: "Lane", oakridge: "Lane",
+  // Deschutes / Crook / Jefferson
+  bend: "Deschutes", redmond: "Deschutes", sisters: "Deschutes",
+  "la pine": "Deschutes", prineville: "Crook", madras: "Jefferson",
+  culver: "Jefferson", metolius: "Jefferson",
+  // Jackson / Josephine
+  medford: "Jackson", ashland: "Jackson", "central point": "Jackson",
+  talent: "Jackson", phoenix: "Jackson", "eagle point": "Jackson",
+  jacksonville: "Jackson", "white city": "Jackson", "rogue river": "Jackson",
+  "gold hill": "Jackson", "shady cove": "Jackson",
+  "grants pass": "Josephine", "cave junction": "Josephine",
+  // Douglas / Coos / Curry
+  roseburg: "Douglas", sutherlin: "Douglas", winston: "Douglas",
+  "myrtle creek": "Douglas", reedsport: "Douglas", canyonville: "Douglas",
+  "coos bay": "Coos", "north bend": "Coos", coquille: "Coos",
+  bandon: "Coos", "myrtle point": "Coos",
+  brookings: "Curry", "gold beach": "Curry", "port orford": "Curry",
+  // Coast: Clatsop / Tillamook / Lincoln / Columbia
+  astoria: "Clatsop", seaside: "Clatsop", warrenton: "Clatsop",
+  "cannon beach": "Clatsop", gearhart: "Clatsop",
+  tillamook: "Tillamook", "rockaway beach": "Tillamook", garibaldi: "Tillamook",
+  manzanita: "Tillamook", nehalem: "Tillamook",
+  newport: "Lincoln", "lincoln city": "Lincoln", toledo: "Lincoln",
+  waldport: "Lincoln", "depoe bay": "Lincoln", yachats: "Lincoln", siletz: "Lincoln",
+  "st helens": "Columbia", "saint helens": "Columbia", scappoose: "Columbia",
+  rainier: "Columbia", clatskanie: "Columbia", vernonia: "Columbia",
+  // Columbia Gorge
+  "hood river": "Hood River", "cascade locks": "Hood River",
+  "the dalles": "Wasco", dufur: "Wasco", mosier: "Wasco", maupin: "Wasco",
+  condon: "Gilliam", arlington: "Gilliam", moro: "Sherman", rufus: "Sherman",
+  "grass valley": "Sherman",
+  // Eastern Oregon
+  pendleton: "Umatilla", hermiston: "Umatilla", "milton-freewater": "Umatilla",
+  umatilla: "Umatilla", stanfield: "Umatilla", "pilot rock": "Umatilla",
+  heppner: "Morrow", boardman: "Morrow", irrigon: "Morrow",
+  "la grande": "Union", "island city": "Union", elgin: "Union",
+  enterprise: "Wallowa", joseph: "Wallowa",
+  "baker city": "Baker", ontario: "Malheur", vale: "Malheur", nyssa: "Malheur",
+  burns: "Harney", hines: "Harney", lakeview: "Lake",
+  "klamath falls": "Klamath", chiloquin: "Klamath",
+  "john day": "Grant", "canyon city": "Grant", "prairie city": "Grant",
+  "mount vernon": "Grant", fossil: "Wheeler",
 };
 
 function clean(text: string): string {
@@ -175,9 +224,15 @@ function firstEmail(text: string): string | null {
 }
 
 /**
- * Best-effort county. "Marion County" in the agency name is the easy case;
- * otherwise fall back to the city in the ship-to address. Null is a fine
- * answer — the analysis prompt sees the raw location text either way.
+ * Best-effort county.
+ *
+ * Two signals, in order of trust:
+ *  1. "Marion County" written out in the agency name or location.
+ *  2. The city on a "Talent, OR 97540" address line.
+ *
+ * Deliberately NOT a loose scan for city names anywhere in the text — that
+ * puts a Beaverton job in Umatilla County the moment a buyer is called Adams.
+ * Null is a fine answer; the analysis prompt reads the raw location either way.
  */
 export function inferCounty(text: string): string | null {
   if (!text.trim()) return null;
@@ -185,9 +240,13 @@ export function inferCounty(text: string): string | null {
   for (const county of OREGON_COUNTIES) {
     if (new RegExp(`\\b${county}\\s+County\\b`, "i").test(text)) return county;
   }
-  const lower = text.toLowerCase();
-  for (const [city, county] of Object.entries(CITY_TO_COUNTY)) {
-    if (new RegExp(`\\b${city}\\b`, "i").test(lower)) return county;
+
+  // "City, OR 97540" / "City, Oregon 97540" — take the last one, which is the
+  // ship-to city rather than a street name earlier in the block.
+  const matches = [...text.matchAll(/([A-Za-z][A-Za-z .'-]{1,30}?),\s*(?:OR|Oregon)\.?\s+\d{5}/gi)];
+  for (const match of matches.reverse()) {
+    const city = match[1].trim().toLowerCase().replace(/\.$/, "");
+    if (CITY_TO_COUNTY[city]) return CITY_TO_COUNTY[city];
   }
   return null;
 }

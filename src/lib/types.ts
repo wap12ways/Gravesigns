@@ -6,8 +6,12 @@ export type EstimateStatus = "draft" | "reviewed" | "submitted";
 export type PriceUnit = "sf" | "lf" | "ea" | "hr" | "day" | "ls" | "cy";
 export type PriceCategory =
   | "asbestos"
-  | "lead"
   | "mold"
+  | "radon"
+  | "sewer"
+  | "tank"
+  | "testing"
+  | "lead"
   | "demo"
   | "hazmat"
   | "general";

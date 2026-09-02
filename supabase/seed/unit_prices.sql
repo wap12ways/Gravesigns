@@ -1,5 +1,11 @@
 -- ─────────────────────────────────────────────────────────────────────────────
--- PLACEHOLDER unit prices — Portland, OR metro, commercial/public work.
+-- PLACEHOLDER unit prices — Portland/Beaverton metro, commercial and public work.
+--
+-- Covers both halves of Alpha's business: remediation (asbestos, mold, radon,
+-- tanks, sewer) and the testing/consulting side (surveys, sampling, air
+-- monitoring, reports). The lead and demo categories are ADJACENT work that
+-- Alpha does not advertise — kept so an estimator can price it if Alpha does
+-- in fact self-perform it.
 --
 -- EVERY ROW IS A PLACEHOLDER. The numbers are plausible 2026 Portland-market
 -- figures assembled for testing the estimator, NOT Alpha's real rates. Replace
@@ -81,13 +87,59 @@ insert into unit_prices (category, item_code, description, unit, unit_cost, unit
 ('hazmat','HAZ-LABPACK','Lab pack / hazardous drum characterisation and disposal','ea',385.00,560.00,'PLACEHOLDER'),
 ('hazmat','HAZ-TECH','40-hr HAZWOPER technician','hr',72.00,104.00,'PLACEHOLDER'),
 
+-- ── radon ───────────────────────────────────────────────────────────────────
+('radon','RAD-TEST-SHORT','Short-term radon test, 48-96 hr device, placement and retrieval','ea',95.00,140.00,'PLACEHOLDER'),
+('radon','RAD-TEST-LONG','Long-term radon test, 90+ day alpha track device','ea',145.00,210.00,'PLACEHOLDER'),
+('radon','RAD-TEST-CONT','Continuous radon monitor placement and report, per device','ea',185.00,270.00,'PLACEHOLDER'),
+('radon','RAD-MIT-SSD','Sub-slab depressurization system, first suction point','ea',1450.00,2100.00,'PLACEHOLDER'),
+('radon','RAD-MIT-ADD','Sub-slab depressurization, each additional suction point','ea',575.00,840.00,'PLACEHOLDER'),
+('radon','RAD-MIT-CRAWL','Crawlspace membrane and sub-membrane depressurization','sf',4.25,6.20,'PLACEHOLDER'),
+('radon','RAD-FAN','Radon fan, supply and install with electrical','ea',425.00,620.00,'PLACEHOLDER'),
+('radon','RAD-SEAL','Seal slab cracks, joints and penetrations','lf',8.50,12.50,'PLACEHOLDER'),
+('radon','RAD-POST','Post-mitigation clearance test and report','ea',165.00,240.00,'PLACEHOLDER'),
+
+-- ── sewer ───────────────────────────────────────────────────────────────────
+('sewer','SEW-INSP','Sewer lateral video inspection with written report','ea',285.00,415.00,'PLACEHOLDER'),
+('sewer','SEW-LOCATE','Line locating and depth marking','ea',195.00,285.00,'PLACEHOLDER'),
+('sewer','SEW-CLEAN','Hydro-jetting and sewer line cleaning','ea',425.00,620.00,'PLACEHOLDER'),
+('sewer','SEW-CIPP','Trenchless CIPP lining, cured in place','lf',95.00,138.00,'PLACEHOLDER'),
+('sewer','SEW-BURST','Pipe bursting replacement, trenchless','lf',135.00,195.00,'PLACEHOLDER'),
+('sewer','SEW-SPOT','Excavated spot repair, single point','ea',2800.00,4050.00,'PLACEHOLDER'),
+('sewer','SEW-CLEANOUT','Install exterior cleanout','ea',850.00,1250.00,'PLACEHOLDER'),
+('sewer','SEW-RESTORE','Surface restoration after excavation','sf',18.00,26.00,'PLACEHOLDER'),
+
+-- ── storage tanks, septic and soil ──────────────────────────────────────────
+('tank','TNK-SCAN','Underground storage tank scan and sweep, GPR and magnetometer','ea',385.00,560.00,'PLACEHOLDER'),
+('tank','TNK-DECOM-PLACE','Tank decommissioning in place, clean and fill','ea',2400.00,3500.00,'PLACEHOLDER'),
+('tank','TNK-DECOM-REM','Tank decommissioning by removal, up to 1,000 gal','ea',4200.00,6100.00,'PLACEHOLDER'),
+('tank','TNK-DECOM-LG','Tank decommissioning by removal, over 1,000 gal','ea',7500.00,10900.00,'PLACEHOLDER'),
+('tank','TNK-SOIL-SAMPLE','DEQ-protocol soil sampling with laboratory analysis','ea',650.00,950.00,'PLACEHOLDER'),
+('tank','TNK-DEQ-FILE','DEQ file review, reporting and site closure package','ea',1250.00,1800.00,'PLACEHOLDER'),
+('tank','TNK-SEPTIC-PUMP','Septic tank pumping and disposal','ea',585.00,850.00,'PLACEHOLDER'),
+('tank','TNK-SEPTIC-DECOM','Septic tank decommissioning per county requirements','ea',1650.00,2400.00,'PLACEHOLDER'),
+
+-- ── testing, surveys and monitoring ─────────────────────────────────────────
+('testing','TST-ASB-SURVEY','Asbestos survey, limited pre-renovation scope','ea',850.00,1250.00,'PLACEHOLDER'),
+('testing','TST-ASB-FULL','Asbestos survey, full building pre-demolition','ea',2400.00,3500.00,'PLACEHOLDER'),
+('testing','TST-ASB-BULK','Bulk sample analysis, PLM','ea',32.00,48.00,'PLACEHOLDER'),
+('testing','TST-ASB-PCM','Air sample analysis, PCM','ea',45.00,65.00,'PLACEHOLDER'),
+('testing','TST-ASB-TEM','Clearance air sample analysis, TEM','ea',145.00,210.00,'PLACEHOLDER'),
+('testing','TST-AIR-DAY','Air monitoring technician on site, per day','day',750.00,1090.00,'PLACEHOLDER'),
+('testing','TST-CLEAR','Visual clearance inspection and written report','ea',425.00,620.00,'PLACEHOLDER'),
+('testing','TST-MOLD-INSP','Mold inspection with moisture mapping and report','ea',495.00,720.00,'PLACEHOLDER'),
+('testing','TST-MOLD-SAMPLE','Mold air or surface sample with laboratory analysis','ea',85.00,125.00,'PLACEHOLDER'),
+('testing','TST-LEAD-XRF','Lead-based paint XRF inspection, per building','ea',650.00,950.00,'PLACEHOLDER'),
+('testing','TST-LEAD-DUST','Lead dust wipe sample with laboratory analysis','ea',55.00,80.00,'PLACEHOLDER'),
+('testing','TST-IAQ','Indoor air quality assessment and report','ea',975.00,1400.00,'PLACEHOLDER'),
+('testing','TST-REPORT','Report preparation, certification and delivery','ea',385.00,560.00,'PLACEHOLDER'),
+
 -- ── general conditions ──────────────────────────────────────────────────────
 ('general','GEN-MOB','Mobilization and demobilization','ls',2200.00,3200.00,'PLACEHOLDER'),
 ('general','GEN-PM','Project manager','hr',95.00,136.00,'PLACEHOLDER'),
 ('general','GEN-SUPER','Site superintendent','hr',82.00,118.00,'PLACEHOLDER'),
 ('general','GEN-SURVEY','Pre-abatement survey and bulk sampling','ls',1850.00,2650.00,'PLACEHOLDER'),
 ('general','GEN-DESIGN','Abatement project design / work plan (third party)','ls',2800.00,4000.00,'PLACEHOLDER'),
-('general','GEN-IH-AIR','Third-party air monitoring and clearance, per day on site','day',950.00,1350.00,'PLACEHOLDER'),
+('general','GEN-IH-AIR','Independent third-party air monitoring and clearance, per day','day',950.00,1350.00,'PLACEHOLDER — only when the bid requires a monitor independent of the abatement contractor; otherwise use TST-AIR-DAY'),
 ('general','GEN-PERMIT','DEQ / agency notification and permit fees','ls',425.00,620.00,'PLACEHOLDER'),
 ('general','GEN-NEG-AIR','Negative air machine, per unit per day','day',95.00,140.00,'PLACEHOLDER'),
 ('general','GEN-TEMP-POWER','Temporary power, lighting and water','ls',1450.00,2100.00,'PLACEHOLDER'),

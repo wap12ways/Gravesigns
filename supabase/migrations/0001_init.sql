@@ -86,7 +86,8 @@ create index if not exists solicitation_analysis_score_idx
 create table if not exists unit_prices (
   id          uuid primary key default gen_random_uuid(),
   category    text not null
-                check (category in ('asbestos', 'lead', 'mold', 'demo', 'hazmat', 'general')),
+                check (category in ('asbestos', 'mold', 'radon', 'sewer', 'tank',
+                                    'testing', 'lead', 'demo', 'hazmat', 'general')),
   item_code   text not null unique,
   description text not null,
   unit        text not null

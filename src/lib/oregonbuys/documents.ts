@@ -49,9 +49,12 @@ export async function fetchDocuments(
         throw new Error(`download returned ${response.status} (${response.body.length} bytes)`);
       }
 
+      // Prefer the Content-Disposition filename. OregonBuys link text is often
+      // a human label with no extension ("Request for Quotes - Asbestos
+      // Abatement") while the header carries the real name.
       const fileName = response.filename ?? attachment.fileName;
       const storagePath = `${sanitizeSegment(bidNumber)}/${attachment.fileNbr}-${sanitizeSegment(fileName)}`;
-      const mimeType = guessMimeType(fileName, response.contentType);
+      const mimeType = guessMimeType(fileName, response.contentType, response.body);
 
       const { error: uploadError } = await supabase.storage
         .from(BID_DOCS_BUCKET)
@@ -148,9 +151,17 @@ function sanitizeSegment(name: string): string {
     .slice(0, 120) || "file";
 }
 
-function guessMimeType(fileName: string, headerValue: string | null): string {
+function guessMimeType(fileName: string, headerValue: string | null, body?: Buffer): string {
+  // A PDF is a PDF whatever it is called. Sniffing first means an attachment
+  // with no extension and no useful header still gets its text extracted.
+  if (body && body.subarray(0, 5).toString("latin1") === "%PDF-") return "application/pdf";
+  if (body && body.subarray(0, 4).toString("latin1") === "PK\u0003\u0004") {
+    // Office Open XML containers are zips. Fall through to the extension,
+    // which distinguishes docx from xlsx from a plain zip.
+  }
+
   // The site sends application/octet-stream for everything, so trust the
-  // extension first and fall back to the header.
+  // extension next and fall back to the header.
   const ext = fileName.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1];
   const byExt: Record<string, string> = {
     pdf: "application/pdf",

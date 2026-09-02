@@ -4,7 +4,9 @@ import type { PriceCategory, PriceUnit } from "@/lib/types";
 
 export const runtime = "nodejs";
 
-const CATEGORIES: PriceCategory[] = ["asbestos", "lead", "mold", "demo", "hazmat", "general"];
+const CATEGORIES: PriceCategory[] = [
+  "asbestos", "mold", "radon", "sewer", "tank", "testing", "lead", "demo", "hazmat", "general",
+];
 const UNITS: PriceUnit[] = ["sf", "lf", "ea", "hr", "day", "ls", "cy"];
 
 interface PriceInput {

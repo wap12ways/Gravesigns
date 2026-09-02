@@ -7,6 +7,13 @@ scores them for fit against Alpha's trade profile, pulls the scope out of the bi
 documents with Claude, and turns that scope into a priced estimate package ready
 for review.
 
+Alpha is both a testing/consulting practice and a licensed contractor
+(Oregon CCB 152125), so the scoring treats a survey or air-monitoring contract
+as just as good a fit as a remediation job. Published services: asbestos
+abatement and testing; mold removal, testing and inspections; radon testing and
+mitigation; underground storage tank scanning, decommissioning, septic and soil
+testing; sewer inspections, trenchless repair and line cleaning.
+
 It is a private operator tool. One password, no user accounts.
 
 ---
@@ -32,7 +39,9 @@ Create a project, then in **SQL Editor** run, in order:
 
 1. `supabase/migrations/0001_init.sql` — tables, indexes, RLS lockdown, and the
    private `bid-documents` storage bucket.
-2. `supabase/seed/unit_prices.sql` — 74 placeholder unit prices.
+2. `supabase/seed/unit_prices.sql` — 112 placeholder unit prices across ten
+   categories: asbestos, mold, radon, sewer, tank, testing, lead, demo, hazmat
+   and general conditions.
 
 > Every rate in the seed is a **placeholder** with Portland-market-plausible
 > numbers, flagged `PLACEHOLDER` in its `notes`. Replace them from `/prices`
@@ -99,6 +108,21 @@ supabase/
   migrations/      schema
   seed/            placeholder unit prices
 ```
+
+### The contractor profile is the most consequential file
+
+`src/config/company.ts` holds `CONTRACTOR_PROFILE`, the text every fit score is
+measured against. It is split three ways on purpose:
+
+- **Self-performed** — Alpha's published services. These can score a straight
+  `bid`.
+- **Adjacent** — lead abatement, selective demolition, general hazmat, industrial
+  hygiene. Plausible for a CCB-licensed environmental firm but *not advertised*,
+  so the prompt routes them to `review` and a human decides.
+- **Not a fit** — `no_bid` regardless of score.
+
+Move a service between those three lists and every subsequent score changes.
+That is the intended way to tune the tool.
 
 ### Things worth knowing
 

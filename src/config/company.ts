@@ -1,67 +1,106 @@
 /**
- * Alpha Environmental Services LLC — company identity.
+ * Alpha Environmental Services — company identity.
  *
  * Everything the estimate package prints about *us* lives here. Edit this one
  * file; nothing else needs to change.
  *
- * TODO(alpha): replace the placeholder values below with the real ones.
+ * Facts below are taken from alphaenvironmental.net (verified 2026-09-02).
  */
 
 export const COMPANY = {
-  legalName: "Alpha Environmental Services LLC", // TODO(alpha): confirm exact legal name
+  legalName: "Alpha Environmental Services",
   shortName: "Alpha Environmental",
-  address1: "TODO: street address",
-  address2: "Portland, OR 97XXX",
-  phone: "(503) 000-0000", // TODO(alpha)
-  email: "estimating@example.com", // TODO(alpha)
-  website: "", // optional
+  address1: "11080 SW Allen Blvd., #100",
+  address2: "Beaverton, OR 97005",
+  // The website lists (503) 292-5346 on every page. A screenshot from the
+  // operator showed (503) 676-6327 — confirm which belongs on estimates.
+  phone: "(503) 292-5346",
+  email: "info@alphaenvironmental.net",
+  website: "alphaenvironmental.net",
 
-  /** Oregon CCB license number, printed on the estimate cover page. */
-  ccbLicense: "TODO: CCB #",
+  /** Oregon CCB number, printed on the estimate cover page. */
+  ccbLicense: "Oregon CCB License No. 152125",
 
-  /** Other licences / certifications worth printing under the letterhead. */
+  /** Other licences and accreditations worth printing under the letterhead. */
   licenses: [
-    "TODO: Oregon DEQ Asbestos Abatement Contractor Licence #",
-    "TODO: AHERA accreditations held",
-    "TODO: Oregon Lead-Based Paint (LBP) certification #",
+    // TODO(alpha): fill these in — they are strong differentiators on public
+    // work and the cover letter prompt is forbidden from inventing them.
+    "TODO: Oregon DEQ asbestos abatement contractor licence #",
+    "TODO: AHERA accreditations held (supervisor, inspector, project designer)",
+    "TODO: Oregon radon measurement / mitigation credentials (NRPP or NRSB)",
   ],
 
   /** Who signs the cover letter. */
   signer: {
     name: "TODO: signer name",
     title: "Estimator",
-    email: "estimating@example.com",
-    phone: "(503) 000-0000",
+    email: "info@alphaenvironmental.net",
+    phone: "(503) 292-5346",
   },
 } as const;
 
 /**
- * The contractor profile handed to Claude for fit scoring. Keep it factual and
- * current — this text is what the model reasons against, so editing it changes
- * every score from that point on.
+ * The contractor profile handed to Claude for fit scoring.
+ *
+ * This is the single most consequential piece of text in the app — it is what
+ * every score is measured against. It is written from Alpha's own published
+ * service list, not from assumptions.
+ *
+ * Note the three-way split. Work in "self-performed" can score a straight
+ * `bid`. Work in "adjacent" is deliberately routed to `review` rather than
+ * `no_bid`, so a human decides. Work in "not a fit" is `no_bid`.
  */
-export const CONTRACTOR_PROFILE = `Portland, Oregon environmental services contractor.
+export const CONTRACTOR_PROFILE = `Beaverton, Oregon environmental services company, family owned,
+serving Portland and the surrounding metro area. Both a testing/consulting
+practice and a licensed contractor (Oregon CCB 152125) — it wins work on both
+sides, and a solicitation for surveys, sampling or monitoring is just as much
+a fit as one for physical remediation.
 
-Self-performed work:
-- Asbestos abatement (friable and non-friable, NESHAP work)
-- Lead abatement and lead-safe renovation
-- Mold remediation
-- Hazardous materials removal and disposal
+SELF-PERFORMED — advertised services:
+
+Asbestos
+- Asbestos abatement
+- Asbestos testing, surveys and bulk sampling
+
+Mold
+- Mold removal / remediation
+- Mold testing and inspections
+
+Radon
+- Radon testing (short-term, long-term, continuous monitoring)
+- Radon mitigation (sub-slab depressurization, crawlspace systems)
+
+Storage tanks and soil
+- Underground storage tank scanning and sweeps
+- Tank decommissioning, in place and by removal
+- Septic pumping and septic tank decommissioning
+- Soil testing and sampling
+
+Sewer
+- Sewer video inspections
+- Trenchless sewer repair (CIPP lining, pipe bursting)
+- Sewer line cleaning
+
+ADJACENT — plausible but NOT advertised. Score these as "review" so a human
+decides, never "no_bid" on trade grounds alone:
+- Lead paint inspection, testing and abatement
 - Selective and interior demolition
-- Industrial hygiene support (air monitoring, clearances via third-party CIH)
-- Site cleanup, decontamination, encapsulation
+- General hazardous materials removal and disposal (PCBs, universal waste,
+  mercury devices)
+- Industrial hygiene support and indoor air quality work
 
-Geography: works statewide in Oregon. Strong preference for the Portland metro
-area, then the Willamette Valley, then SW Washington border counties (Clark,
-Cowlitz, Skamania, Klickitat). Eastern and coastal Oregon are workable but
-carry travel and per-diem cost.
+GEOGRAPHY: Beaverton-based, so Washington and Multnomah counties are the home
+ground, then Clackamas, then the rest of the Willamette Valley, then SW
+Washington border counties (Clark, Cowlitz, Skamania, Klickitat). Eastern and
+coastal Oregon are workable but carry travel and per-diem cost.
 
-Typical project size: $25,000 to $500,000. Comfortable down to about $10,000
-and up to roughly $1,000,000 with bonding in place.
+TYPICAL PROJECT SIZE: $10,000 to $500,000. Testing and survey contracts run
+smaller than remediation and are still worth bidding — do not penalise a
+$15,000 asbestos survey contract for being small.
 
-Typically NOT a fit: new construction general contracting, civil/heavy highway,
-paving, landscaping, IT and professional services, supply-only commodity bids,
-and staffing contracts.`;
+NOT A FIT: new construction general contracting, civil and heavy highway,
+paving, landscaping, roofing, IT and software, professional consulting outside
+the environmental field, food and commodity supply, staffing contracts.`;
 
 /** Estimate defaults. Editable per-estimate in the UI. */
 export const ESTIMATE_DEFAULTS = {
