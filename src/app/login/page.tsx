@@ -33,7 +33,7 @@ function LoginForm() {
   return (
     <form onSubmit={submit} className="w-full max-w-sm space-y-4">
       <div>
-        <h1 className="text-lg font-semibold text-white">Alpha Bid Desk</h1>
+        <h1 className="text-lg font-semibold text-white">Alpha Estimate</h1>
         <p className="mt-1 text-sm text-slate-400">OregonBuys bid intelligence and estimating.</p>
       </div>
       <input

@@ -15,7 +15,7 @@ export function Sidebar() {
   return (
     <nav className="no-print flex w-48 shrink-0 flex-col bg-ink-900 text-slate-300">
       <div className="border-b border-ink-700 px-4 py-4">
-        <div className="text-sm font-semibold text-white">Alpha Bid Desk</div>
+        <div className="text-sm font-semibold text-white">Alpha Estimate</div>
         <div className="mt-0.5 text-2xs uppercase tracking-wide text-slate-500">
           OregonBuys
         </div>

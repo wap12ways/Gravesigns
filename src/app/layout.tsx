@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Alpha Bid Desk",
+  title: "Alpha Estimate",
   description: "OregonBuys bid intelligence and estimating for Alpha Environmental Services.",
 };
 
