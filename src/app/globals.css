@@ -2,170 +2,55 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  :root {
-    /* Deep midnight blue / violet luxury palette */
-    --background: 240 38% 6%;
-    --foreground: 40 30% 92%;
-
-    --card: 244 34% 10%;
-    --card-foreground: 40 30% 92%;
-
-    --primary: 43 74% 66%;
-    --primary-foreground: 244 40% 8%;
-
-    --secondary: 262 30% 18%;
-    --secondary-foreground: 40 30% 92%;
-
-    --muted: 244 24% 16%;
-    --muted-foreground: 250 15% 65%;
-
-    --accent: 268 45% 30%;
-    --accent-foreground: 40 30% 92%;
-
-    --border: 250 25% 22%;
-    --input: 250 25% 20%;
-    --ring: 43 74% 66%;
-
-    --radius: 0.9rem;
-  }
+:root {
+  color-scheme: light;
 }
 
-@layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground font-sans antialiased;
-    background-image:
-      radial-gradient(ellipse 80% 50% at 50% -10%, rgba(120, 86, 196, 0.18), transparent),
-      radial-gradient(ellipse 60% 50% at 90% 20%, rgba(201, 162, 39, 0.08), transparent);
-    background-attachment: fixed;
-  }
-  h1, h2, h3, h4 {
-    @apply font-serif;
-  }
+body {
+  @apply bg-slate-100 text-slate-900 antialiased;
+  font-feature-settings: "tnum" 1;
 }
 
+/* Dense table defaults used across the operator screens. */
 @layer components {
-  .gold-text {
-    background: linear-gradient(120deg, #f4d98c 0%, #e9c46a 40%, #c9a227 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+  .op-table {
+    @apply w-full border-collapse text-sm;
+  }
+  .op-table thead th {
+    @apply sticky top-0 z-10 border-b border-slate-300 bg-slate-200/95 px-3 py-2
+           text-left text-2xs font-semibold uppercase tracking-wide text-slate-600;
+  }
+  .op-table tbody td {
+    @apply border-b border-slate-200 px-3 py-2 align-top;
+  }
+  .op-table tbody tr:hover {
+    @apply bg-alpha-light/60;
   }
 
-  .gold-hairline {
-    background: linear-gradient(90deg, transparent, rgba(233, 196, 106, 0.6), transparent);
+  .field {
+    @apply w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm
+           outline-none focus:border-alpha focus:ring-1 focus:ring-alpha;
   }
-
-  .glass {
-    background: rgba(20, 18, 38, 0.55);
-    backdrop-filter: blur(14px);
-    border: 1px solid rgba(233, 196, 106, 0.14);
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded border
+           border-transparent bg-alpha px-3 py-1.5 text-sm font-medium text-white
+           transition hover:bg-alpha-dark disabled:cursor-not-allowed disabled:opacity-50;
   }
-
-  /* Renders the AI reading with elegant prose spacing */
-  .reading-prose {
-    @apply text-[15px] leading-relaxed text-foreground/85;
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-1.5 rounded border
+           border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700
+           transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50;
   }
-  .reading-prose h2 {
-    @apply gold-text text-xl mt-8 mb-3 tracking-wide;
+  .card {
+    @apply rounded-md border border-slate-200 bg-white shadow-sm;
   }
-  .reading-prose h3 {
-    @apply text-gold-light text-base font-semibold mt-6 mb-2 uppercase tracking-[0.15em];
+  .card-title {
+    @apply border-b border-slate-200 px-4 py-2.5 text-2xs font-semibold
+           uppercase tracking-wide text-slate-500;
   }
-  .reading-prose p {
-    @apply mb-4;
-  }
-  .reading-prose ul {
-    @apply mb-4 space-y-1.5 pl-5 list-disc marker:text-gold/60;
-  }
-  .reading-prose strong {
-    @apply text-gold-light font-semibold;
-  }
-  .reading-prose em {
-    @apply text-foreground/70 italic;
-  }
-  .reading-prose hr {
-    @apply my-8 border-0 h-px gold-hairline;
-  }
-  .reading-prose blockquote {
-    @apply border-l-2 border-gold/40 pl-4 italic text-foreground/70 my-4;
-  }
-}
-
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 10px;
-}
-::-webkit-scrollbar-track {
-  background: hsl(var(--background));
-}
-::-webkit-scrollbar-thumb {
-  background: hsl(var(--border));
-  border-radius: 6px;
-}
-
-/* ── Print / PDF keepsake ─────────────────────────────────────
-   On screen the print-only title block is hidden; in print we hide the
-   app chrome and interactive panels and render a gentle, ink-light page
-   so families can save the reading itself as a keepsake PDF. */
-.print-only {
-  display: none;
 }
 
 @media print {
-  .no-print {
-    display: none !important;
-  }
-  .print-only {
-    display: block;
-  }
-  html,
-  body {
-    background: #fbf9f4 !important;
-    color: #241f17 !important;
-  }
-  main {
-    margin: 0 !important;
-  }
-  .print-keepsake,
-  .print-keepsake > * {
-    border: none !important;
-    background: transparent !important;
-    box-shadow: none !important;
-  }
-  .print-keepsake {
-    max-width: 44rem;
-    margin: 0 auto;
-  }
-  .reading-prose,
-  .reading-prose p,
-  .reading-prose li,
-  .print-keepsake h1,
-  .print-keepsake p {
-    color: #241f17 !important;
-  }
-  .reading-prose h2 {
-    color: #7a5c1a !important;
-  }
-  .reading-prose h3,
-  .reading-prose strong,
-  .print-keepsake .text-gold\/70 {
-    color: #9a7420 !important;
-  }
-  .reading-prose em {
-    color: #4a4436 !important;
-  }
-  .reading-prose hr {
-    background: #d8cba8 !important;
-  }
-  .reading-prose blockquote {
-    border-left-color: #c9a227 !important;
-    color: #4a4436 !important;
-  }
-  @page {
-    margin: 1.6cm;
-  }
+  .no-print { display: none !important; }
+  body { @apply bg-white; }
 }
