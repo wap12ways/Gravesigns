@@ -3,9 +3,9 @@
 --
 -- Covers both halves of Alpha's business: remediation (asbestos, mold, radon,
 -- tanks, sewer) and the testing/consulting side (surveys, sampling, air
--- monitoring, reports). The lead and demo categories are ADJACENT work that
--- Alpha does not advertise — kept so an estimator can price it if Alpha does
--- in fact self-perform it.
+-- monitoring, reports). Lead abatement and demolition are deliberately absent:
+-- Alpha does not self-perform either, and the contractor profile scores them
+-- no_bid unless our own trade is a separable part of the scope.
 --
 -- EVERY ROW IS A PLACEHOLDER. The numbers are plausible 2026 Portland-market
 -- figures assembled for testing the estimator, NOT Alpha's real rates. Replace
@@ -43,16 +43,6 @@ insert into unit_prices (category, item_code, description, unit, unit_cost, unit
 ('asbestos','ASB-SUPER','Licensed asbestos supervisor','hr',78.00,112.00,'PLACEHOLDER — add GEN-PW-PREM on prevailing wage jobs'),
 ('asbestos','ASB-WORKER','AHERA-accredited abatement worker','hr',62.00,89.00,'PLACEHOLDER — add GEN-PW-PREM on prevailing wage jobs'),
 
--- ── lead ────────────────────────────────────────────────────────────────────
-('lead','LEAD-CHEM','Lead paint removal, chemical stripping','sf',9.50,13.75,'PLACEHOLDER'),
-('lead','LEAD-ABRASIVE','Lead paint removal, needle gun / abrasive with HEPA','sf',11.00,16.00,'PLACEHOLDER'),
-('lead','LEAD-ENCAP','Apply lead encapsulant coating','sf',2.25,3.30,'PLACEHOLDER'),
-('lead','LEAD-COMPONENT','Component removal and replacement, lead-painted','sf',6.50,9.50,'PLACEHOLDER'),
-('lead','LEAD-SOIL','Excavate and dispose lead-contaminated soil','cy',145.00,210.00,'PLACEHOLDER'),
-('lead','LEAD-CLEAR','Lead clearance cleaning, HEPA and wet wipe','sf',1.35,2.00,'PLACEHOLDER'),
-('lead','LEAD-DISP','Lead hazardous waste disposal, 55 gal drum','ea',220.00,320.00,'PLACEHOLDER'),
-('lead','LEAD-RRP','RRP-compliant containment and setup, per work area','ls',1250.00,1800.00,'PLACEHOLDER'),
-('lead','LEAD-WORKER','Lead-certified abatement worker','hr',60.00,86.00,'PLACEHOLDER'),
 
 -- ── mold ────────────────────────────────────────────────────────────────────
 ('mold','MOLD-HEPA','HEPA vacuum and damp wipe non-porous surfaces','sf',1.85,2.70,'PLACEHOLDER'),
@@ -65,16 +55,6 @@ insert into unit_prices (category, item_code, description, unit, unit_cost, unit
 ('mold','MOLD-DEHU','Commercial dehumidifier, per unit per day','day',110.00,160.00,'PLACEHOLDER'),
 ('mold','MOLD-TECH','Remediation technician','hr',58.00,84.00,'PLACEHOLDER'),
 
--- ── demolition ──────────────────────────────────────────────────────────────
-('demo','DEMO-INT','Interior non-structural demolition, walls to studs','sf',4.75,6.90,'PLACEHOLDER'),
-('demo','DEMO-SELECT','Selective demolition, hand work in occupied building','hr',78.00,112.00,'PLACEHOLDER'),
-('demo','DEMO-SLAB','Saw cut and remove concrete slab on grade, to 6 in.','sf',9.50,13.75,'PLACEHOLDER'),
-('demo','DEMO-CMU','Remove CMU or masonry wall','sf',8.25,12.00,'PLACEHOLDER'),
-('demo','DEMO-CEIL','Remove suspended ceiling grid and tile (non-ACM)','sf',1.65,2.40,'PLACEHOLDER'),
-('demo','DEMO-FLOOR','Remove flooring and adhesive (non-ACM)','sf',2.25,3.30,'PLACEHOLDER'),
-('demo','DEMO-MEP','MEP disconnect, cap and strip-out','sf',3.40,4.95,'PLACEHOLDER'),
-('demo','DEMO-HAUL','Construction debris haul and disposal','cy',78.00,115.00,'PLACEHOLDER'),
-('demo','DEMO-ROLLOFF','30 cy roll-off container, delivered and hauled','ea',725.00,1050.00,'PLACEHOLDER'),
 
 -- ── hazmat ──────────────────────────────────────────────────────────────────
 ('hazmat','HAZ-LAMP','Universal waste fluorescent lamp removal and recycling','ea',3.75,5.50,'PLACEHOLDER'),
@@ -128,8 +108,8 @@ insert into unit_prices (category, item_code, description, unit, unit_cost, unit
 ('testing','TST-CLEAR','Visual clearance inspection and written report','ea',425.00,620.00,'PLACEHOLDER'),
 ('testing','TST-MOLD-INSP','Mold inspection with moisture mapping and report','ea',495.00,720.00,'PLACEHOLDER'),
 ('testing','TST-MOLD-SAMPLE','Mold air or surface sample with laboratory analysis','ea',85.00,125.00,'PLACEHOLDER'),
-('testing','TST-LEAD-XRF','Lead-based paint XRF inspection, per building','ea',650.00,950.00,'PLACEHOLDER'),
-('testing','TST-LEAD-DUST','Lead dust wipe sample with laboratory analysis','ea',55.00,80.00,'PLACEHOLDER'),
+('testing','TST-LEAD-XRF','Lead-based paint XRF inspection, per building','ea',650.00,950.00,'PLACEHOLDER — lead is not an advertised service; confirm before quoting, or deactivate this row'),
+('testing','TST-LEAD-DUST','Lead dust wipe sample with laboratory analysis','ea',55.00,80.00,'PLACEHOLDER — lead is not an advertised service; confirm before quoting, or deactivate this row'),
 ('testing','TST-IAQ','Indoor air quality assessment and report','ea',975.00,1400.00,'PLACEHOLDER'),
 ('testing','TST-REPORT','Report preparation, certification and delivery','ea',385.00,560.00,'PLACEHOLDER'),
 

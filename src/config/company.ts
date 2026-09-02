@@ -81,13 +81,17 @@ Sewer
 - Trenchless sewer repair (CIPP lining, pipe bursting)
 - Sewer line cleaning
 
+Testing and consulting (this half is as much a fit as the remediation half)
+- Environmental surveys, bulk and air sampling, laboratory coordination
+- Air monitoring and clearance testing
+- Industrial hygiene support and indoor air quality assessment
+- Inspection reports, DEQ reporting and site closure documentation
+
 ADJACENT — plausible but NOT advertised. Score these as "review" so a human
 decides, never "no_bid" on trade grounds alone:
-- Lead paint inspection, testing and abatement
-- Selective and interior demolition
 - General hazardous materials removal and disposal (PCBs, universal waste,
-  mercury devices)
-- Industrial hygiene support and indoor air quality work
+  mercury devices, lab packs) where it is incidental to a tank, soil or
+  abatement scope
 
 GEOGRAPHY: Beaverton-based, so Washington and Multnomah counties are the home
 ground, then Clackamas, then the rest of the Willamette Valley, then SW
@@ -98,7 +102,19 @@ TYPICAL PROJECT SIZE: $10,000 to $500,000. Testing and survey contracts run
 smaller than remediation and are still worth bidding — do not penalise a
 $15,000 asbestos survey contract for being small.
 
-NOT A FIT: new construction general contracting, civil and heavy highway,
+NOT A FIT — Alpha does not self-perform these, so score "no_bid" on trade
+grounds:
+- Lead paint abatement and lead-safe renovation
+- Demolition of any kind: structural, selective or interior
+
+IMPORTANT on the two above. A solicitation is only a no_bid if the lead or
+demolition work IS the job. Public work very often bundles our trade into a
+demolition or renovation package — "pre-demolition asbestos survey and
+abatement", "abate ACM prior to demolition by others", "lead and asbestos
+survey". Where Alpha's own trade is a real, separable part of the scope, score
+it on that part and recommend "bid" or "review", not "no_bid".
+
+ALSO NOT A FIT: new construction general contracting, civil and heavy highway,
 paving, landscaping, roofing, IT and software, professional consulting outside
 the environmental field, food and commodity supply, staffing contracts.`;
 

@@ -11,8 +11,6 @@ export type PriceCategory =
   | "sewer"
   | "tank"
   | "testing"
-  | "lead"
-  | "demo"
   | "hazmat"
   | "general";
 
