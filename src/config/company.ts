@@ -21,19 +21,35 @@ export const COMPANY = {
   /** Oregon CCB number, printed on the estimate cover page. */
   ccbLicense: "Oregon CCB License No. 152125",
 
-  /** Other licences and accreditations worth printing under the letterhead. */
+  /** Serving the Portland metro since — stated on alphaenvironmental.net. */
+  established: 1999,
+
+  /**
+   * Credentials printed under the letterhead on every estimate.
+   *
+   * ONLY put things here that are true and checkable. This text goes to public
+   * agency buyers, who do verify. Every line below is taken verbatim from
+   * Alpha's own published claims.
+   *
+   * TODO(alpha): these are worth adding once you have the actual numbers —
+   * they are real differentiators on public work, and the cover-letter prompt
+   * is deliberately forbidden from inventing them:
+   *   - Oregon DEQ asbestos abatement contractor licence number
+   *   - AHERA accreditations held (supervisor, inspector, project designer)
+   *   - Radon credentials (NRPP or NRSB certification number)
+   *   - Bond and insurance limits, if a buyer asks for them up front
+   * Add them as extra strings in this array; they print automatically.
+   */
   licenses: [
-    // TODO(alpha): fill these in — they are strong differentiators on public
-    // work and the cover letter prompt is forbidden from inventing them.
-    "TODO: Oregon DEQ asbestos abatement contractor licence #",
-    "TODO: AHERA accreditations held (supervisor, inspector, project designer)",
-    "TODO: Oregon radon measurement / mitigation credentials (NRPP or NRSB)",
+    "Licensed Oregon DEQ service provider",
+    "Licensed, bonded and insured",
+    "Serving the Portland metro area since 1999",
   ],
 
   /** Who signs the cover letter. */
   signer: {
-    name: "TODO: signer name",
-    title: "Estimator",
+    name: "John Smith",
+    title: "Estimator", // TODO(alpha): swap for John's real title if it differs
     email: "info@alphaenvironmental.net",
     phone: "(503) 292-5346",
   },
