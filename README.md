@@ -89,20 +89,32 @@ Two Hobby limits shape the setup. Neither costs the app anything real:
 
 | Limit | Effect | What we do |
 | --- | --- | --- |
-| **Cron runs once per day, max** | A `0 */4 * * *` expression **fails the deployment** with *"Hobby accounts are limited to daily cron jobs"* | `vercel.json` schedules daily. `.github/workflows/scrape.yml` pokes the same endpoint every 4 hours from GitHub Actions, for free |
+| **Cron runs once per day, max** | A `0 */4 * * *` expression **fails the deployment** with *"Hobby accounts are limited to daily cron jobs"* | `vercel.json` schedules daily, and something else pokes the endpoint every 4 hours — see below |
 | **Cron timing is ±59 minutes** | A job set for 13:00 fires somewhere in the 13:00 hour | Irrelevant — bids close on dates, not minutes |
 
 Function `maxDuration` is **not** a problem: Hobby allows the full 300 s, which
 is what every long route here declares.
 
-To turn on the 4-hourly sweep, add two repository secrets under
-*Settings → Secrets and variables → Actions*:
+##### Getting the 4-hourly sweep back, free
 
-- `APP_URL` — `https://your-project.vercel.app`, no trailing slash
-- `CRON_SECRET` — the same value you set in Vercel
+Two ways. Pick one — running both is harmless but pointless.
 
-The workflow skips silently if either is missing. You can also fire it by hand
-from the Actions tab, or press **Run scraper** on `/admin`.
+**Supabase (recommended).** You already pay nothing for it and it needs no new
+account. Enable the `pg_cron` and `pg_net` extensions under
+*Database → Extensions*, then edit the two placeholders in
+`supabase/scheduled_scrape.sql` and run it. That file also contains the queries
+for checking the schedule fired.
+
+**GitHub Actions.** `.github/workflows/scrape.yml` does the same thing on the
+same schedule. Add two repository secrets under
+*Settings → Secrets and variables → Actions* — `APP_URL`
+(`https://your-project.vercel.app`, no trailing slash) and `CRON_SECRET`, the
+same value you set in Vercel. The workflow skips silently if either is
+missing, so it stays green when unused. It needs Actions to be enabled and in
+good standing on the account, which is why Supabase is the better default.
+
+Either way, **Run scraper** on `/admin` triggers a sweep by hand whenever you
+want one.
 
 #### If Vercel refuses the deployment
 

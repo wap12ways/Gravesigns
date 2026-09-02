@@ -4,6 +4,10 @@
 # vercel.json fails deployment outright. vercel.json therefore holds a daily
 # job, and this workflow pokes the same endpoint every four hours for free.
 #
+# This needs GitHub Actions enabled and in good standing on the account. If it
+# is not, use supabase/scheduled_scrape.sql instead — same schedule, same
+# endpoint, driven by pg_cron on the Supabase free tier, no GitHub involved.
+#
 # Setup (Settings → Secrets and variables → Actions):
 #   APP_URL       https://your-project.vercel.app   (no trailing slash)
 #   CRON_SECRET   the same value set in Vercel's environment variables
