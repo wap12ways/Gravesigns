@@ -6,7 +6,13 @@ import { latestAnalysis } from "@/lib/analysis";
 import { db } from "@/lib/supabase";
 import { signedDocumentUrl } from "@/lib/oregonbuys/documents";
 import { daysUntil, formatPacific } from "@/lib/time";
-import type { Solicitation, SolicitationAnalysis, SolicitationDocument } from "@/lib/types";
+import { usd } from "@/lib/money";
+import type {
+  Estimate,
+  Solicitation,
+  SolicitationAnalysis,
+  SolicitationDocument,
+} from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +47,13 @@ export default async function SolicitationPage({
   );
 
   const analysis = (await latestAnalysis(id)) as SolicitationAnalysis | null;
+
+  const { data: estimateRows } = await supabase
+    .from("estimates")
+    .select("*")
+    .eq("solicitation_id", id)
+    .order("version", { ascending: false });
+  const estimates = (estimateRows ?? []) as Estimate[];
   const days = daysUntil(bid.close_at);
 
   return (
@@ -64,6 +77,15 @@ export default async function SolicitationPage({
               busyLabel="Analysing…"
               variant={analysis ? "ghost" : "primary"}
             />
+            {analysis && (
+              <ActionButton
+                endpoint={`/api/solicitations/${bid.id}/estimate`}
+                label={estimates.length ? "New estimate version" : "Generate estimate"}
+                busyLabel="Pricing…"
+                redirectKey="estimateId"
+                redirectTo="/estimates/:id"
+              />
+            )}
           </div>
         </div>
 
@@ -126,6 +148,57 @@ export default async function SolicitationPage({
           scope out of the documents.
         </section>
       )}
+
+      <section className="card">
+        <div className="card-title">Estimates ({estimates.length})</div>
+        <div className="overflow-x-auto">
+          <table className="op-table">
+            <thead>
+              <tr>
+                <th className="w-20">Version</th>
+                <th>Status</th>
+                <th className="text-right">Lines</th>
+                <th className="text-right">Subtotal</th>
+                <th className="text-right">Total</th>
+                <th>Created</th>
+              </tr>
+            </thead>
+            <tbody>
+              {estimates.map((estimate) => (
+                <tr key={estimate.id}>
+                  <td>
+                    <Link
+                      href={`/estimates/${estimate.id}`}
+                      className="font-medium text-alpha hover:underline"
+                    >
+                      v{estimate.version}
+                    </Link>
+                  </td>
+                  <td className="text-2xs uppercase tracking-wide text-slate-600">
+                    {estimate.status}
+                  </td>
+                  <td className="text-right tabular-nums">
+                    {estimate.line_items?.length ?? 0}
+                  </td>
+                  <td className="text-right tabular-nums">{usd(estimate.subtotal)}</td>
+                  <td className="text-right font-medium tabular-nums">{usd(estimate.total)}</td>
+                  <td className="text-2xs text-slate-500">
+                    {formatPacific(estimate.created_at)}
+                  </td>
+                </tr>
+              ))}
+              {!estimates.length && (
+                <tr>
+                  <td colSpan={6} className="text-slate-500">
+                    No estimates yet.
+                    {!analysis && " Analyse the bid first."}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       <section className="card">
         <div className="card-title">Documents ({links.length})</div>
