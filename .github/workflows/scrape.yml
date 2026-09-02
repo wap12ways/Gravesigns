@@ -1,0 +1,64 @@
+# Four-hourly scrape on the free tier.
+#
+# Vercel's Hobby plan caps cron at ONCE PER DAY — a more frequent expression in
+# vercel.json fails deployment outright. vercel.json therefore holds a daily
+# job, and this workflow pokes the same endpoint every four hours for free.
+#
+# Setup (Settings → Secrets and variables → Actions):
+#   APP_URL       https://your-project.vercel.app   (no trailing slash)
+#   CRON_SECRET   the same value set in Vercel's environment variables
+#
+# Without both secrets the job skips rather than failing, so a fork or a
+# fresh clone stays green.
+#
+# Two things to know about GitHub's scheduler: it is best effort and can run
+# late under load, and it pauses scheduled workflows after 60 days without
+# repository activity. Neither matters much here — a late sweep still catches
+# the bid, and /admin has a "Run scraper" button.
+
+name: Scrape OregonBuys
+
+on:
+  schedule:
+    - cron: "0 */4 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: oregonbuys-scrape
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Trigger the scrape
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "APP_URL or CRON_SECRET is not set — skipping."
+            exit 0
+          fi
+
+          response=$(mktemp)
+          status=$(curl -sS -o "$response" -w '%{http_code}' \
+            --max-time 330 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$APP_URL/api/cron/scrape")
+
+          echo "HTTP $status"
+          cat "$response"
+          echo
+
+          if [ "$status" != "200" ]; then
+            echo "::error::Scrape endpoint returned $status"
+            exit 1
+          fi
+
+          # runScrape reports ok:false when individual bids errored. Surface
+          # that as a warning, not a failure — the run still did useful work.
+          if grep -q '"ok":false' "$response"; then
+            echo "::warning::The scrape finished with errors. Check /admin for the run log."
+          fi

@@ -79,9 +79,45 @@ You will land on `/login`. Enter `APP_PASSWORD`.
 ### 4. Deploy
 
 Import the repo in Vercel, set the same six variables under
-*Settings → Environment Variables*, deploy. `vercel.json` registers the
-4-hourly cron against `/api/cron/scrape`; Vercel supplies the
+*Settings → Environment Variables*, deploy. `vercel.json` registers a daily
+cron against `/api/cron/scrape`; Vercel supplies the
 `Authorization: Bearer $CRON_SECRET` header automatically.
+
+#### Running on the free (Hobby) plan
+
+Two Hobby limits shape the setup. Neither costs the app anything real:
+
+| Limit | Effect | What we do |
+| --- | --- | --- |
+| **Cron runs once per day, max** | A `0 */4 * * *` expression **fails the deployment** with *"Hobby accounts are limited to daily cron jobs"* | `vercel.json` schedules daily. `.github/workflows/scrape.yml` pokes the same endpoint every 4 hours from GitHub Actions, for free |
+| **Cron timing is ±59 minutes** | A job set for 13:00 fires somewhere in the 13:00 hour | Irrelevant — bids close on dates, not minutes |
+
+Function `maxDuration` is **not** a problem: Hobby allows the full 300 s, which
+is what every long route here declares.
+
+To turn on the 4-hourly sweep, add two repository secrets under
+*Settings → Secrets and variables → Actions*:
+
+- `APP_URL` — `https://your-project.vercel.app`, no trailing slash
+- `CRON_SECRET` — the same value you set in Vercel
+
+The workflow skips silently if either is missing. You can also fire it by hand
+from the Actions tab, or press **Run scraper** on `/admin`.
+
+#### If Vercel refuses the deployment
+
+Hobby projects only build commits from a GitHub account linked to the Vercel
+account that owns the project. A *"they're not a member of the team"* email
+means that link is missing. Three fixes, cheapest first:
+
+1. Link the GitHub account in Vercel under
+   *Account Settings → Authentication → GitHub*. Free, and the right fix.
+2. Make the repository public. Vercel builds public repos on Hobby regardless
+   of who pushed. Nothing in this repo is sensitive — `.env.local` is
+   gitignored and `.env.example` holds only placeholders — but check before
+   you flip it.
+3. Upgrade to Pro and add the account as a collaborator. Costs money; the
+   other two do not.
 
 ---
 
