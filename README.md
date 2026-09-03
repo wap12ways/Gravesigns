@@ -184,6 +184,12 @@ That is the intended way to tune the tool.
 
 ### Things worth knowing
 
+- **Inclusions are a grid, not prose.** Agencies ask for them that way — see
+  section 5.6 of the City of Talent asbestos RFQ, which wants a row per item
+  marked Included / Excluded / N/A. `src/config/inclusions.ts` holds the
+  standard rows; the model marks each against the bid documents and may add
+  more. Emitting a paragraph instead would leave an estimator hand-transferring
+  answers onto the agency's form.
 - **The model never does arithmetic.** Claude proposes line items and
   quantities; `src/lib/money.ts` computes every subtotal, markup, contingency
   and total.

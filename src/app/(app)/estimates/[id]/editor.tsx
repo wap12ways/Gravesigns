@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { computeTotals, usd } from "@/lib/money";
-import type { Estimate, LineItem, UnitPrice } from "@/lib/types";
+import { INCLUSION_STATUS_LABEL, type InclusionStatus } from "@/config/inclusions";
+import type { Estimate, InclusionRow, LineItem, UnitPrice } from "@/lib/types";
 
 /**
  * The estimate editor. Totals recompute locally as you type so the number
@@ -26,6 +27,7 @@ export function EstimateEditor({
   const [lineItems, setLineItems] = useState<LineItem[]>(estimate.line_items ?? []);
   const [markupPct, setMarkupPct] = useState(Number(estimate.markup_pct));
   const [contingencyPct, setContingencyPct] = useState(Number(estimate.contingency_pct));
+  const [inclusions, setInclusions] = useState<InclusionRow[]>(estimate.inclusions ?? []);
   const [assumptions, setAssumptions] = useState(estimate.assumptions ?? "");
   const [exclusions, setExclusions] = useState(estimate.exclusions ?? "");
   const [narrative, setNarrative] = useState(estimate.narrative ?? "");
@@ -84,6 +86,7 @@ export function EstimateEditor({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           line_items: lineItems,
+          inclusions,
           markup_pct: markupPct,
           contingency_pct: contingencyPct,
           assumptions,
@@ -119,6 +122,11 @@ export function EstimateEditor({
   }
 
   const assumedCount = lineItems.filter((li) => !li.qty_from_docs).length;
+  const excludedCount = inclusions.filter((row) => row.status === "excluded").length;
+
+  function updateInclusion(index: number, patch: Partial<InclusionRow>) {
+    setInclusions((current) => current.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+  }
 
   return (
     <div className="space-y-4 p-6">
@@ -373,6 +381,101 @@ export function EstimateEditor({
           </div>
         </section>
       </div>
+
+      <section className="card">
+        <div className="card-title flex items-center justify-between">
+          <span>Inclusions and exclusions ({inclusions.length} rows)</span>
+          {excludedCount > 0 && (
+            <span className="font-normal normal-case tracking-normal text-amber-700">
+              {excludedCount} excluded — the buyer will read these
+            </span>
+          )}
+        </div>
+        <div className="overflow-x-auto">
+          <table className="op-table">
+            <thead>
+              <tr>
+                <th className="w-[40%]">Item</th>
+                <th className="w-56">Status</th>
+                <th>Note</th>
+                <th className="w-8"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {inclusions.map((row, index) => (
+                <tr
+                  key={index}
+                  className={row.status === "excluded" ? "bg-amber-50/50" : ""}
+                >
+                  <td>
+                    <input
+                      value={row.item}
+                      onChange={(e) => updateInclusion(index, { item: e.target.value })}
+                      className="field"
+                    />
+                  </td>
+                  <td>
+                    <div className="inline-flex overflow-hidden rounded border border-slate-300">
+                      {(["included", "excluded", "na"] as InclusionStatus[]).map((status) => (
+                        <button
+                          key={status}
+                          type="button"
+                          onClick={() => updateInclusion(index, { status })}
+                          className={`px-2 py-1 text-2xs transition ${
+                            row.status === status
+                              ? status === "included"
+                                ? "bg-alpha font-medium text-white"
+                                : status === "excluded"
+                                  ? "bg-amber-500 font-medium text-white"
+                                  : "bg-slate-400 font-medium text-white"
+                              : "bg-white text-slate-600 hover:bg-slate-50"
+                          }`}
+                        >
+                          {INCLUSION_STATUS_LABEL[status]}
+                        </button>
+                      ))}
+                    </div>
+                  </td>
+                  <td>
+                    <input
+                      value={row.note ?? ""}
+                      onChange={(e) => updateInclusion(index, { note: e.target.value || null })}
+                      placeholder="e.g. by others, allowance only, daytime access assumed"
+                      className="field text-2xs"
+                    />
+                  </td>
+                  <td>
+                    <button
+                      onClick={() => setInclusions((c) => c.filter((_, i) => i !== index))}
+                      title="Delete row"
+                      className="text-slate-400 hover:text-red-600"
+                    >
+                      ✕
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {!inclusions.length && (
+                <tr>
+                  <td colSpan={4} className="text-slate-500">
+                    No checklist yet. Regenerate the estimate, or add rows by hand.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="border-t border-slate-200 p-3">
+          <button
+            onClick={() =>
+              setInclusions((c) => [...c, { item: "", status: "excluded", note: null }])
+            }
+            className="btn-ghost"
+          >
+            + Add row
+          </button>
+        </div>
+      </section>
 
       <section className="card">
         <div className="card-title flex items-center justify-between">
