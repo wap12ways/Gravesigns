@@ -4,11 +4,11 @@ import { PriceEditor } from "./price-editor";
 
 export const dynamic = "force-dynamic";
 
-export default async function PricesPage() {
+export default async function CostLibraryPage() {
   if (!isDbConfigured()) {
     return (
       <div className="p-6">
-        <h1 className="text-base font-semibold">Unit prices</h1>
+        <h1 className="text-base font-semibold">Cost library</h1>
         <p className="mt-2 text-sm text-red-600">Supabase is not configured.</p>
       </div>
     );
@@ -22,7 +22,7 @@ export default async function PricesPage() {
 
   return (
     <div className="space-y-4 p-6">
-      <h1 className="text-base font-semibold">Unit prices</h1>
+      <h1 className="text-base font-semibold">Cost library</h1>
       <PriceEditor prices={(data ?? []) as UnitPrice[]} />
     </div>
   );

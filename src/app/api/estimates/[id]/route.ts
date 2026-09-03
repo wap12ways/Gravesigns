@@ -67,3 +67,34 @@ export async function PATCH(
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true, estimate: saved, totals });
 }
+
+/** Delete an estimate. Versions are independent, so this removes just this one. */
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+  const supabase = db();
+
+  const { data: existing } = await supabase
+    .from("estimates")
+    .select("id, status")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (!existing) {
+    return NextResponse.json({ error: "Estimate not found." }, { status: 404 });
+  }
+  if (existing.status === "submitted") {
+    // A submitted estimate is a record of what went to a public buyer. Reopen
+    // it first if it really needs to go.
+    return NextResponse.json(
+      { error: "This estimate is marked submitted. Set it back to draft before deleting it." },
+      { status: 409 },
+    );
+  }
+
+  const { error } = await supabase.from("estimates").delete().eq("id", id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}
