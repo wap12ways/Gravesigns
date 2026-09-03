@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { COMPANY } from "@/config/company";
 import { usd, round2 } from "@/lib/money";
@@ -51,10 +52,19 @@ export default async function PrintPage({
       <PrintButton />
 
       {/* Letterhead */}
-      <header className="flex items-start justify-between border-b-2 border-slate-800 pb-4">
+      <header className="flex items-start justify-between border-b-2 border-[#0d4d6b] pb-4">
         <div>
-          <div className="text-lg font-bold tracking-tight">{COMPANY.legalName}</div>
-          <div className="mt-1 text-xs leading-relaxed text-slate-600">
+          {/* print-color-adjust keeps the logo from being dropped when a
+              browser prints with "background graphics" off. */}
+          <Image
+            src="/alpha-logo.png"
+            alt={COMPANY.legalName}
+            width={462}
+            height={203}
+            priority
+            className="h-14 w-auto [print-color-adjust:exact] [-webkit-print-color-adjust:exact]"
+          />
+          <div className="mt-2 text-xs leading-relaxed text-slate-600">
             {COMPANY.address1}
             <br />
             {COMPANY.address2}
@@ -117,7 +127,7 @@ export default async function PrintPage({
 
       {/* Line items */}
       <section className="mt-8">
-        <h2 className="border-b border-slate-300 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
+        <h2 className="border-b border-[#4cc4e0] pb-1 text-xs font-semibold uppercase tracking-wide text-[#0d4d6b]">
           Schedule of values
         </h2>
         <table className="mt-2 w-full border-collapse text-xs">
@@ -169,7 +179,7 @@ export default async function PrintPage({
               <td className="py-1.5 pr-2 text-right">Contingency {estimate.contingency_pct}%</td>
               <td className="py-1.5 text-right tabular-nums">{usd(contingency)}</td>
             </tr>
-            <tr className="border-t-2 border-slate-800 text-sm font-bold">
+            <tr className="border-t-2 border-[#0d4d6b] text-sm font-bold">
               <td colSpan={4} />
               <td className="py-2 pr-2 text-right">Total</td>
               <td className="py-2 text-right tabular-nums">{usd(estimate.total)}</td>
@@ -185,7 +195,7 @@ export default async function PrintPage({
 
       {estimate.assumptions && (
         <section className="mt-6 break-inside-avoid">
-          <h2 className="border-b border-slate-300 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
+          <h2 className="border-b border-[#4cc4e0] pb-1 text-xs font-semibold uppercase tracking-wide text-[#0d4d6b]">
             Assumptions
           </h2>
           <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-slate-800">
@@ -196,7 +206,7 @@ export default async function PrintPage({
 
       {estimate.exclusions && (
         <section className="mt-6 break-inside-avoid">
-          <h2 className="border-b border-slate-300 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
+          <h2 className="border-b border-[#4cc4e0] pb-1 text-xs font-semibold uppercase tracking-wide text-[#0d4d6b]">
             Exclusions
           </h2>
           <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-slate-800">
@@ -206,6 +216,7 @@ export default async function PrintPage({
       )}
 
       <footer className="mt-10 border-t border-slate-300 pt-4 text-xs text-slate-600">
+        <div className="mb-1 font-semibold text-[#0d4d6b]">{COMPANY.legalName}</div>
         <div className="font-semibold text-slate-900">{COMPANY.signer.name}</div>
         <div>{COMPANY.signer.title}</div>
         <div>
