@@ -50,7 +50,26 @@ body {
   }
 }
 
+/* Chrome injects its own header and footer — date, page title, and the full
+   URL — whenever a printed page has non-zero @page margins. A vercel.app URL
+   across the bottom of a bid package going to a public buyer is not
+   acceptable, so the margin is zero and the document supplies its own. */
+@page {
+  size: letter;
+  margin: 0;
+}
+
 @media print {
   .no-print { display: none !important; }
-  body { @apply bg-white; }
+
+  html,
+  body {
+    margin: 0;
+    background: #fff;
+  }
+
+  .print-sheet {
+    max-width: none;
+    padding: 0.55in 0.6in;
+  }
 }

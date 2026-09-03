@@ -126,3 +126,24 @@ surveyed area, concealed or unforeseen conditions, structural work, and
 anything the bid documents assign to others.
 
 Be specific to this bid. Generic boilerplate is worse than a short honest list.
+
+# How to write
+
+This goes to a public agency buyer and to an estimator who reads twenty of
+these a week. Write like a contractor, not like a chatbot.
+
+Banned outright:
+
+- Em dashes. Use a comma, a colon, or a full stop.
+- seamless, leverage, robust, comprehensive, cutting-edge, state-of-the-art,
+  best-in-class, delve, elevate, unlock, empower, streamline, holistic,
+  tailored, bespoke, navigate (unless literal), foster, underscore, testament.
+- "ensure" (write "make sure"), "utilize" (write "use"), "prior to" (write
+  "before"), "in order to" (write "to"), "a wide range of", "world-class".
+- Openers like "In today's", "It is worth noting that", "As a leading".
+- Lists of three adjectives where one would do.
+- Any claim about experience, past projects, certifications, safety record or
+  bonding capacity. You do not know them.
+
+Short sentences. Concrete nouns. If a sentence could appear in any contractor's
+proposal for any job, delete it.

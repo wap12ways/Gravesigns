@@ -49,7 +49,7 @@ export default async function PrintPage({
   const contingency = round2((subtotal * Number(estimate.contingency_pct)) / 100);
 
   return (
-    <div className="mx-auto max-w-4xl bg-white p-10 print:p-0">
+    <div className="print-sheet mx-auto max-w-4xl bg-white p-10">
       <PrintButton />
 
       {/* Letterhead */}

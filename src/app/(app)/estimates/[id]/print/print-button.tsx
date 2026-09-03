@@ -7,7 +7,7 @@ export function PrintButton() {
         Print / Save as PDF
       </button>
       <span className="text-2xs text-slate-500">
-        Choose “Save as PDF” as the destination. Everything below prints; this bar does not.
+        Set the destination to “Save as PDF”. This bar does not print.
       </span>
     </div>
   );
