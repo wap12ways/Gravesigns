@@ -135,15 +135,24 @@ export async function ConnectionCheck() {
   }
 
   // ── Anthropic ──
+  const workspaceId = process.env.ANTHROPIC_WORKSPACE_ID?.trim();
   checks.push({
     label: "ANTHROPIC_API_KEY",
     ok: Boolean(anthropic?.startsWith("sk-ant-")),
-    detail: anthropic
-      ? `${anthropic.slice(0, 11)}… · ${anthropic.length} chars`
-      : "not set",
+    detail: anthropic ? `${anthropic.slice(0, 11)}… · ${anthropic.length} chars` : "not set",
     hint: anthropic
       ? undefined
       : "Needed for Analyse and Generate estimate. The scraper works without it.",
+  });
+  checks.push({
+    label: "ANTHROPIC_WORKSPACE_ID",
+    ok: true,
+    detail: workspaceId ? `${workspaceId.slice(0, 14)}… · sent as a header` : "not set (fine for a workspace-scoped key)",
+    hint: workspaceId
+      ? undefined
+      : 'Only needed if Anthropic answers "anthropic-workspace-id is required when ' +
+        'authenticating with an identity-linked API key". Set it to the workspace id ' +
+        "(wrkspc_…) from the Anthropic console, or make a workspace-scoped key instead.",
   });
 
   const allOk = checks.every((c) => c.ok);
