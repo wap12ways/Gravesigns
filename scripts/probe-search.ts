@@ -15,7 +15,7 @@ async function main() {
     console.log(`Sweeping ${SEARCH_TERMS.length} terms (~4s each)…\n`);
     const result = await sweepSearches(Date.now() + 10 * 60_000);
     for (const row of result.rows.values()) {
-      console.log(`${row.docId.padEnd(22)} ${(row.closes ?? "").padEnd(21)} ${(row.title ?? "").slice(0, 62)}`);
+      console.log(`${row.docId.padEnd(22)} ${(row.closeAtText ?? "").padEnd(21)} ${(row.title ?? "").slice(0, 62)}`);
     }
     console.log(`\n${result.rows.size} distinct bids from ${result.searched} searches`);
     for (const e of result.errors) console.log(`  ! ${e.stage}: ${e.message}`);

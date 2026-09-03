@@ -1,6 +1,7 @@
 import { db, isDbConfigured } from "@/lib/supabase";
 import { formatPacific } from "@/lib/time";
 import type { ScrapeRun } from "@/lib/types";
+import { AnalyzeAllButton } from "./analyze-all-button";
 import { ConnectionCheck } from "./connection-check";
 import { ImportForm } from "./import-form";
 import { RunScraperButton } from "./run-scraper-button";
@@ -35,6 +36,7 @@ export default async function AdminPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <ImportForm />
         <RunScraperButton />
+        <AnalyzeAllButton />
       </div>
 
       <div className="card">
