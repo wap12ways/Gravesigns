@@ -1,6 +1,7 @@
 import { db, isDbConfigured } from "@/lib/supabase";
 import { formatPacific } from "@/lib/time";
 import type { ScrapeRun } from "@/lib/types";
+import { ConnectionCheck } from "./connection-check";
 import { ImportForm } from "./import-form";
 import { RunScraperButton } from "./run-scraper-button";
 
@@ -28,6 +29,8 @@ export default async function AdminPage() {
   return (
     <div className="space-y-6 p-6">
       <h1 className="text-base font-semibold">Admin</h1>
+
+      <ConnectionCheck />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <ImportForm />
