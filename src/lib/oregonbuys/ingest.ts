@@ -8,7 +8,7 @@ import { bidDetailUrl, fetchHtml } from "./fetcher";
  * One bid, end to end: fetch the detail page, parse it, upsert the
  * solicitation, then pull down its attachments.
  *
- * Used by both the manual import on /admin and the cron scraper, so the two
+ * Used by both the manual import on /intake and the cron scraper, so the two
  * paths can never drift apart.
  */
 

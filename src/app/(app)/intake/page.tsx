@@ -12,7 +12,7 @@ export default async function AdminPage() {
   if (!isDbConfigured()) {
     return (
       <div className="p-6">
-        <h1 className="text-base font-semibold">Admin</h1>
+        <h1 className="text-base font-semibold">Intake</h1>
         <p className="mt-2 max-w-lg text-sm text-red-600">
           Supabase is not configured. Set <code>SUPABASE_URL</code> and{" "}
           <code>SUPABASE_SERVICE_ROLE_KEY</code>, then reload.
@@ -29,7 +29,7 @@ export default async function AdminPage() {
 
   return (
     <div className="space-y-6 p-6">
-      <h1 className="text-base font-semibold">Admin</h1>
+      <h1 className="text-base font-semibold">Intake</h1>
 
       <ConnectionCheck />
 
