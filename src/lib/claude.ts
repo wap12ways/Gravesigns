@@ -18,10 +18,20 @@ import { db, isDbConfigured } from "./supabase";
 let client: Anthropic | null = null;
 
 function anthropic(): Anthropic {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!process.env.ANTHROPIC_API_KEY?.trim()) {
     throw new Error("ANTHROPIC_API_KEY is not set. Copy .env.example to .env.local.");
   }
-  if (!client) client = new Anthropic();
+  if (!client) {
+    // An identity-linked API key (one not bound to a single workspace) is
+    // rejected unless the request names the workspace it acts in. A key that
+    // is already workspace-scoped ignores the header, so sending it whenever
+    // the variable is present is safe either way.
+    const workspaceId = process.env.ANTHROPIC_WORKSPACE_ID?.trim();
+    client = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY.trim(),
+      ...(workspaceId ? { defaultHeaders: { "anthropic-workspace-id": workspaceId } } : {}),
+    });
+  }
   return client;
 }
 
