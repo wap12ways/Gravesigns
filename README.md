@@ -119,7 +119,7 @@ is what every long route here declares.
 ##### If daily ever feels too slow
 
 It probably will not — OregonBuys posts few enough bids that a daily catch is
-plenty, and `/admin` has a **Run scraper** button for when you want one now.
+plenty, and `/intake` has a **Run scraper** button for when you want one now.
 
 If you do want more, `supabase/scheduled_scrape.sql` adds extra sweeps using
 `pg_cron` and `pg_net` on Supabase's free tier. Two extensions to enable, two
@@ -213,7 +213,7 @@ Worth writing down, because it drove the design:
   returns `403` from the WAF even with a live ViewState, session cookie and
   browser headers. So the cron scrape covers page 1 (the newest 25 open bids),
   which is comfortably more than OregonBuys posts in a day. Anything that slips
-  past gets caught by **manual import by URL** on `/admin`.
+  past gets caught by **manual import by URL** on `/intake`.
 
 If Alpha ever needs a full sweep of all open bids, the list fetcher sits behind
 a small `ListStrategy` interface, so a Playwright-driven strategy can be dropped

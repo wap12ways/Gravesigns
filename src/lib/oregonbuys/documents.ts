@@ -91,7 +91,7 @@ export async function fetchDocuments(
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       results.push({ fileName: attachment.fileName, status: "failed", detail: message });
-      // Record the attempt so /admin shows what went wrong.
+      // Record the attempt so /intake shows what went wrong.
       await supabase.from("solicitation_documents").upsert(
         {
           solicitation_id: solicitationId,

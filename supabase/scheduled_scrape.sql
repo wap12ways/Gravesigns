@@ -3,7 +3,7 @@
 --
 -- YOU PROBABLY DO NOT NEED THIS.
 -- The daily sweep in vercel.json runs with no setup at all, and OregonBuys
--- posts few enough bids that a daily catch is plenty. /admin has a "Run
+-- posts few enough bids that a daily catch is plenty. /intake has a "Run
 -- scraper" button for when you want one immediately.
 --
 -- Reach for this only if daily starts feeling slow — a bid with a seven-day
@@ -59,7 +59,7 @@ select cron.schedule(
 --
 -- pg_net is asynchronous and its default timeout is short, so a timed-out row
 -- here is expected and harmless — the request still reached Vercel and the
--- function still ran to completion. /admin's scrape run log is the real
+-- function still ran to completion. /intake's scrape run log is the real
 -- record of what happened.
 --
 -- To stop it:  select cron.unschedule('oregonbuys-scrape');

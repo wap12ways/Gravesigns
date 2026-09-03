@@ -28,7 +28,7 @@ export function db(): SupabaseClient {
 
 export const BID_DOCS_BUCKET = "bid-documents";
 
-/** True when Supabase is configured. Used by /admin to show a clear message. */
+/** True when Supabase is configured. Used by /intake to show a clear message. */
 export function isDbConfigured(): boolean {
   return Boolean(url && serviceKey);
 }

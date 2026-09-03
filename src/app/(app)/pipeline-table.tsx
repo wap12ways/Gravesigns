@@ -168,7 +168,7 @@ export function PipelineTable({ rows }: { rows: PipelineRow[] }) {
                 <td colSpan={9} className="text-slate-500">
                   {rows.length
                     ? "Nothing matches these filters."
-                    : "No solicitations yet. Import one on /admin, or run the scraper."}
+                    : "No solicitations yet. Import one on /intake, or run the scraper."}
                 </td>
               </tr>
             )}

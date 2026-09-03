@@ -33,7 +33,7 @@ export interface ParsedBid {
   county: string | null;
   attachments: ParsedAttachment[];
   rawHtmlHash: string;
-  /** Everything the label map found, kept for debugging in /admin. */
+  /** Everything the label map found, kept for debugging in /intake. */
   fields: Record<string, string>;
 }
 

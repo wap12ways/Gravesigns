@@ -12,7 +12,7 @@ import { fetchHtml, OPEN_BIDS_URL } from "./fetcher";
  *
  * That is enough. OregonBuys posts a handful of bids a day; 25 per 4-hour
  * sweep is a wide margin, and anything that does slip past is caught by
- * manual import on /admin.
+ * manual import on /intake.
  *
  * `ListStrategy` exists so a Playwright-driven full sweep can be added later
  * without the rest of the pipeline noticing.
