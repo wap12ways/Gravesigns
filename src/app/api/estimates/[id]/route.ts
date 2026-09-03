@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { computeTotals, normalizeLineItem } from "@/lib/money";
 import { db } from "@/lib/supabase";
-import type { LineItem } from "@/lib/types";
+import type { InclusionRow, LineItem } from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -16,6 +16,7 @@ export async function PATCH(
   const { id } = await params;
   const body = (await request.json().catch(() => ({}))) as {
     line_items?: Partial<LineItem>[];
+    inclusions?: InclusionRow[];
     markup_pct?: number;
     contingency_pct?: number;
     assumptions?: string;
@@ -46,6 +47,7 @@ export async function PATCH(
     subtotal: totals.subtotal,
     total: totals.total,
   };
+  if (body.inclusions !== undefined) update.inclusions = body.inclusions;
   if (body.assumptions !== undefined) update.assumptions = body.assumptions;
   if (body.exclusions !== undefined) update.exclusions = body.exclusions;
   if (body.narrative !== undefined) update.narrative = body.narrative;

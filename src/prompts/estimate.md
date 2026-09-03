@@ -79,17 +79,50 @@ is defensible with `qty_from_docs: false`, and make the first entry in
 `assumptions` say plainly that the scope was not available and this is a
 placeholder pending the specification or a site walk.
 
+# The inclusions checklist
+
+Public agencies ask for inclusions and exclusions as a grid, one row per item
+marked Included, Excluded or N/A — not as prose. Fill one in.
+
+Every item in this list must appear in your `inclusions` output, in this order:
+
+{{standard_inclusions}}
+
+For each, read the bid documents and decide:
+
+- **`included`** — our price covers it. Say so only when the documents put it
+  on the contractor and we have priced a line for it.
+- **`excluded`** — real on this job, but not in our price. This is the one that
+  protects Alpha, so use it whenever the documents are silent and the cost
+  could land on us.
+- **`na`** — genuinely does not arise on this job. A roof abatement has no
+  temporary power need; say `na`, not `excluded`.
+
+Add a short `note` wherever the bare status would mislead — "by others",
+"allowance only", "assumes daytime access", "third-party CIH by owner". Leave
+`note` null when the status speaks for itself.
+
+Add extra rows beyond the standard list when the bid documents name something
+specific that matters: a mandatory site visit, a City business licence, a
+coordination requirement with another contractor, liquidated damages.
+
+Two rules worth stating plainly:
+
+1. Do not mark something `included` because it would look better. An estimator
+   reads this grid to decide what they are exposed to.
+2. If the documents explicitly assign an item to the owner or another
+   contractor, mark it `excluded` with a note saying who has it.
+
 # Assumptions and exclusions
 
 `assumptions` is the list of things that must be true for this price to hold —
 quantities we inferred, access we expect, hours we assumed, conditions we
 expect to find. Each entry is one sentence, written to a buyer.
 
-`exclusions` is what the price does not cover. Always consider: permits and
-agency fees if not listed, third-party air monitoring and clearance testing,
-abatement project design, hazardous material not identified in the survey,
-structural work, restoration and replacement of removed materials, asbestos or
-lead found outside the surveyed area, unforeseen conditions, work outside normal
-hours, bonds, and anything the bid documents assign to others.
+`exclusions` is prose for what the checklist above cannot express — conditions,
+caveats and scope boundaries. Do not simply restate the grid. Cover things like
+hazardous material not identified in the survey, material found outside the
+surveyed area, concealed or unforeseen conditions, structural work, and
+anything the bid documents assign to others.
 
 Be specific to this bid. Generic boilerplate is worse than a short honest list.

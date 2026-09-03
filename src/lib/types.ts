@@ -117,6 +117,12 @@ export interface LineItem {
   qty_from_docs: boolean;
 }
 
+export interface InclusionRow {
+  item: string;
+  status: "included" | "excluded" | "na";
+  note: string | null;
+}
+
 export interface Estimate {
   id: string;
   solicitation_id: string;
@@ -127,6 +133,7 @@ export interface Estimate {
   markup_pct: number;
   contingency_pct: number;
   total: number;
+  inclusions: InclusionRow[];
   assumptions: string | null;
   exclusions: string | null;
   narrative: string | null;

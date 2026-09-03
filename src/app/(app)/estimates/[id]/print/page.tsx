@@ -4,6 +4,7 @@ import { COMPANY } from "@/config/company";
 import { usd, round2 } from "@/lib/money";
 import { db } from "@/lib/supabase";
 import { formatPacific } from "@/lib/time";
+import { INCLUSION_STATUS_LABEL } from "@/config/inclusions";
 import type { Estimate, Solicitation } from "@/lib/types";
 import { PrintButton } from "./print-button";
 
@@ -192,6 +193,44 @@ export default async function PrintPage({
           </p>
         )}
       </section>
+
+      {(estimate.inclusions ?? []).length > 0 && (
+        <section className="mt-6 break-inside-avoid">
+          <h2 className="border-b border-[#4cc4e0] pb-1 text-xs font-semibold uppercase tracking-wide text-[#0d4d6b]">
+            Inclusions and exclusions
+          </h2>
+          <table className="mt-2 w-full border-collapse text-xs">
+            <thead>
+              <tr className="border-b border-slate-300 text-left">
+                <th className="w-[45%] py-1.5 pr-2 font-semibold">Item</th>
+                <th className="w-24 py-1.5 pr-2 font-semibold">Status</th>
+                <th className="py-1.5 font-semibold">Note</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(estimate.inclusions ?? []).map((row, i) => (
+                <tr key={i} className="border-b border-slate-200 align-top">
+                  <td className="py-1.5 pr-2">{row.item}</td>
+                  <td className="py-1.5 pr-2">
+                    <span
+                      className={
+                        row.status === "included"
+                          ? "font-semibold text-[#0d4d6b]"
+                          : row.status === "excluded"
+                            ? "font-semibold text-slate-900"
+                            : "text-slate-500"
+                      }
+                    >
+                      {INCLUSION_STATUS_LABEL[row.status]}
+                    </span>
+                  </td>
+                  <td className="py-1.5 text-slate-600">{row.note ?? ""}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
 
       {estimate.assumptions && (
         <section className="mt-6 break-inside-avoid">

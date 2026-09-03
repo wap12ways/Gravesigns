@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { COMPANY, CONTRACTOR_PROFILE, ESTIMATE_DEFAULTS } from "@/config/company";
+import { STANDARD_INCLUSION_ITEMS } from "@/config/inclusions";
 import { MODELS } from "@/config/models";
 import { askClaude, askClaudeText, fillPrompt, loadPrompt } from "./claude";
 import { computeTotals, normalizeLineItem, usd } from "./money";
@@ -31,6 +32,13 @@ const GeneratedSchema = z.object({
       unit: z.string(),
       assumptions: z.string().nullable(),
       qty_from_docs: z.boolean(),
+    }),
+  ),
+  inclusions: z.array(
+    z.object({
+      item: z.string(),
+      status: z.enum(["included", "excluded", "na"]),
+      note: z.string().nullable(),
     }),
   ),
   assumptions: z.array(z.string()),
@@ -93,6 +101,7 @@ export async function generateEstimate(solicitationId: string): Promise<Estimate
       requirements: JSON.stringify(analysis.requirements ?? {}, null, 2),
       red_flags: (analysis.red_flags ?? []).map((f) => `- ${f}`).join("\n") || "(none)",
       unit_prices: formatPriceBook(prices),
+      standard_inclusions: STANDARD_INCLUSION_ITEMS.map((i) => `- ${i}`).join("\n"),
     }),
     schema: GeneratedSchema,
   });
@@ -192,6 +201,7 @@ export async function generateEstimate(solicitationId: string): Promise<Estimate
       version,
       status: "draft",
       line_items: lineItems,
+      inclusions: generated.inclusions,
       subtotal: totals.subtotal,
       markup_pct: ESTIMATE_DEFAULTS.markupPct,
       contingency_pct: ESTIMATE_DEFAULTS.contingencyPct,
