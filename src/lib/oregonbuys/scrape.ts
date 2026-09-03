@@ -3,6 +3,7 @@ import { db } from "@/lib/supabase";
 import { parseBidDetail } from "./detail";
 import { bidDetailUrl, fetchHtml } from "./fetcher";
 import { fetchListStrategy, type ListStrategy } from "./list";
+import { sweepSearches } from "./search";
 import { storeBid } from "./ingest";
 
 /**
@@ -14,6 +15,14 @@ import { storeBid } from "./ingest";
  *
  *   exports.handler = async () => runScrape({ trigger: "cron" });
  */
+
+/**
+ * Wall-clock budget for one run. Vercel terminates a function at 300s and a
+ * killed run leaves its scrape_runs row open forever, so we stop at 240s and
+ * write an honest record instead. Anything not reached is picked up next run —
+ * scrape_seen means nothing is re-examined for free.
+ */
+const RUN_BUDGET_MS = 240_000;
 
 export interface ScrapeSummary {
   runId: string | null;
@@ -43,6 +52,8 @@ export async function runScrape(options: ScrapeOptions): Promise<ScrapeSummary> 
     .single();
   const runId: string | null = run?.id ?? null;
 
+  const deadline = Date.now() + RUN_BUDGET_MS;
+
   const summary: ScrapeSummary = {
     runId,
     bids_seen: 0,
@@ -55,7 +66,30 @@ export async function runScrape(options: ScrapeOptions): Promise<ScrapeSummary> 
   };
 
   try {
-    const { rows } = await strategy.fetchOpenBids();
+    // Two sources, deduped. The searches reach every open bid on the site;
+    // page one of the list is a cheap backstop that also catches a brand-new
+    // posting whose wording none of our search terms happens to hit.
+    const sweep = await sweepSearches(deadline);
+    errors.push(...sweep.errors);
+    if (sweep.truncated) {
+      errors.push({
+        stage: "search",
+        message: `time budget reached after ${sweep.searched} searches; the rest run next time`,
+      });
+    }
+
+    const byDocId = new Map(sweep.rows);
+    try {
+      const listing = await strategy.fetchOpenBids();
+      for (const row of listing.rows) if (!byDocId.has(row.docId)) byDocId.set(row.docId, row);
+    } catch (error) {
+      errors.push({
+        stage: "open bids list",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    const rows = [...byDocId.values()];
     summary.bids_seen = rows.length;
 
     const bidNumbers = rows.map((r) => r.bidNumber);
@@ -74,6 +108,13 @@ export async function runScrape(options: ScrapeOptions): Promise<ScrapeSummary> 
     );
 
     for (const row of rows) {
+      if (Date.now() > deadline) {
+        errors.push({
+          stage: "bids",
+          message: "time budget reached; remaining bids are picked up on the next run",
+        });
+        break;
+      }
       try {
         // The list row carries a title. If it matches, we already know we want
         // the detail page. If it does not, we still want the detail page the
@@ -115,7 +156,7 @@ export async function runScrape(options: ScrapeOptions): Promise<ScrapeSummary> 
       }
     }
 
-    summary.bids_closed = await closeStaleBids(rows.map((r) => r.bidNumber));
+    summary.bids_closed = await closeStaleBids();
     summary.ok = errors.length === 0;
   } catch (error) {
     errors.push({
@@ -158,10 +199,10 @@ async function touchSeen(bidNumber: string, docId: string, matched: boolean): Pr
  * Close bids whose opening date has passed.
  *
  * Note what this does NOT do: mark a bid closed merely because it is absent
- * from the list. We only ever read page one, so most open bids are absent on
- * any given run. The date is the honest signal.
+ * from a run. Coverage depends on which search terms a bid's wording happens
+ * to hit, so absence proves nothing. The date is the honest signal.
  */
-async function closeStaleBids(_seenOnThisRun: string[]): Promise<number> {
+async function closeStaleBids(): Promise<number> {
   const { data, error } = await db()
     .from("solicitations")
     .update({ status: "closed" })

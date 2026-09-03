@@ -219,6 +219,8 @@ No database or API keys needed for the first two:
 ```bash
 npx tsx scripts/probe-bid.ts S-435000-00017903   # fetch + parse one bid, print everything
 npx tsx scripts/probe-list.ts                    # page 1 of open bids, showing keyword hits
+npx tsx scripts/probe-search.ts desc asbestos    # one search against the live site
+npx tsx scripts/probe-search.ts --sweep          # every configured search term
 npx tsx scripts/run-scrape.ts                    # a full scrape run (needs Supabase)
 ```
 

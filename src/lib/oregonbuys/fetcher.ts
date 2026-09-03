@@ -31,6 +31,23 @@ function takeTurn(): Promise<void> {
   return wait;
 }
 
+/** A response's Set-Cookie values, folded into a single Cookie header. */
+export function collectCookies(headers: Headers, existing?: string): string {
+  const jar = new Map<string, string>();
+  for (const pair of (existing ?? "").split(";")) {
+    const [name, ...rest] = pair.trim().split("=");
+    if (name && rest.length) jar.set(name, rest.join("="));
+  }
+  // getSetCookie is the only way to see multiple Set-Cookie headers.
+  const raw = typeof headers.getSetCookie === "function" ? headers.getSetCookie() : [];
+  for (const cookie of raw) {
+    const [pair] = cookie.split(";");
+    const [name, ...rest] = pair.trim().split("=");
+    if (name && rest.length) jar.set(name, rest.join("="));
+  }
+  return [...jar].map(([k, v]) => `${k}=${v}`).join("; ");
+}
+
 export interface FetchResult {
   status: number;
   body: Buffer;
@@ -38,9 +55,10 @@ export interface FetchResult {
   /** Filename from Content-Disposition, when the server sent one. */
   filename: string | null;
   url: string;
+  cookie: string;
 }
 
-export async function politeFetch(url: string): Promise<FetchResult> {
+export async function politeFetch(url: string, cookie?: string): Promise<FetchResult> {
   await takeTurn();
 
   const response = await fetch(url, {
@@ -48,6 +66,7 @@ export async function politeFetch(url: string): Promise<FetchResult> {
       "user-agent": USER_AGENT,
       accept: "text/html,application/xhtml+xml,application/pdf,*/*",
       "accept-language": "en-US,en;q=0.9",
+      ...(cookie ? { cookie } : {}),
     },
     redirect: "follow",
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -60,6 +79,39 @@ export async function politeFetch(url: string): Promise<FetchResult> {
     contentType: response.headers.get("content-type"),
     filename: filenameFromDisposition(response.headers.get("content-disposition")),
     url: response.url || url,
+    cookie: collectCookies(response.headers, cookie),
+  };
+}
+
+/** A JSF postback: form-encoded body, PrimeFaces AJAX headers, session cookie. */
+export async function politePost(
+  url: string,
+  form: Record<string, string>,
+  cookie: string,
+): Promise<{ status: number; text: string; cookie: string }> {
+  await takeTurn();
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "user-agent": USER_AGENT,
+      "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+      accept: "application/xml, text/xml, */*; q=0.01",
+      "faces-request": "partial/ajax",
+      "x-requested-with": "XMLHttpRequest",
+      referer: url,
+      origin: OREGONBUYS_BASE,
+      cookie,
+    },
+    body: new URLSearchParams(form).toString(),
+    redirect: "follow",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+
+  return {
+    status: response.status,
+    text: await response.text(),
+    cookie: collectCookies(response.headers, cookie),
   };
 }
 
