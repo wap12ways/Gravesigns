@@ -43,10 +43,31 @@ Create a project, then in **SQL Editor** run, in order:
    categories: asbestos, mold, radon, sewer, tank, testing, lead, demo, hazmat
    and general conditions.
 
-> Every rate in the seed is a **placeholder** with Portland-market-plausible
-> numbers, flagged `PLACEHOLDER` in its `notes`. Replace them from `/prices`
-> before quoting real work. Re-running the seed refreshes untouched placeholders
-> and leaves anything you have edited alone.
+> Rates flagged `PLACEHOLDER` in their `notes` are invented, if plausible for
+> the Portland market. Replace them from `/prices` before quoting real work.
+>
+> Rates flagged `ACTUAL` are Alpha's own submitted prices, lifted from the
+> public bid tabulation for Oregon Metro ITB 4513 (opened 8 January 2026).
+> Those are real.
+>
+> Re-running either seed refreshes untouched rows and leaves anything you have
+> edited by hand alone.
+
+### Where the contractor profile came from
+
+`CONTRACTOR_PROFILE` in `src/config/company.ts` is what every fit score is
+measured against, so it is built from evidence rather than assumption:
+
+- The advertised service list on alphaenvironmental.net.
+- The public record for two trades the website omits. Alpha won Metro ITB 4313
+  (2024, $24,460, low bidder), bid Metro's on-call demolition schedule (ITB
+  4513, Jan 2026), and holds FAA contract 697DCK25P00065 (Jun 2025, $78,095)
+  for exterior lead paint abatement. Scoring those `no_bid` — as an
+  advertising-only reading of the business would — would have hidden work Alpha
+  actively wins.
+- Bid tabulations, which also give the profile a competitive note: Alpha wins
+  small defined demolition and is strong on abatement, but has bid three to six
+  times the winning price on large lump-sum demolition.
 
 Copy the project URL and the **service role** key from
 *Project Settings → API Keys*.
