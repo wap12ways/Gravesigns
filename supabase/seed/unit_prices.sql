@@ -3,9 +3,9 @@
 --
 -- Covers both halves of Alpha's business: remediation (asbestos, mold, radon,
 -- tanks, sewer) and the testing/consulting side (surveys, sampling, air
--- monitoring, reports). Lead abatement and demolition are deliberately absent:
--- Alpha does not self-perform either, and the contractor profile scores them
--- no_bid unless our own trade is a separable part of the scope.
+-- monitoring, reports), plus lead. Demolition is NOT here — Alpha's real
+-- demolition rates live in unit_prices_alpha_actual.sql, taken from their own
+-- Metro bid, and are worth far more than anything invented.
 --
 -- EVERY ROW IS A PLACEHOLDER. The numbers are plausible 2026 Portland-market
 -- figures assembled for testing the estimator, NOT Alpha's real rates. Replace
@@ -43,6 +43,20 @@ insert into unit_prices (category, item_code, description, unit, unit_cost, unit
 ('asbestos','ASB-SUPER','Licensed asbestos supervisor','hr',78.00,112.00,'PLACEHOLDER — add GEN-PW-PREM on prevailing wage jobs'),
 ('asbestos','ASB-WORKER','AHERA-accredited abatement worker','hr',62.00,89.00,'PLACEHOLDER — add GEN-PW-PREM on prevailing wage jobs'),
 
+
+-- ── lead ────────────────────────────────────────────────────────────────────
+-- Alpha does self-perform lead work: FAA contract 697DCK25P00065, June 2025,
+-- $78,095 for exterior lead paint abatement at the Burns VOR site. These rates
+-- are still placeholders — the FAA award is a lump sum, not a unit schedule.
+('lead','LEAD-CHEM','Lead paint removal, chemical stripping','sf',9.50,13.75,'PLACEHOLDER'),
+('lead','LEAD-ABRASIVE','Lead paint removal, needle gun / abrasive with HEPA','sf',11.00,16.00,'PLACEHOLDER'),
+('lead','LEAD-ENCAP','Apply lead encapsulant coating','sf',2.25,3.30,'PLACEHOLDER'),
+('lead','LEAD-COMPONENT','Component removal and replacement, lead-painted','sf',6.50,9.50,'PLACEHOLDER'),
+('lead','LEAD-SOIL','Excavate and dispose lead-contaminated soil','cy',145.00,210.00,'PLACEHOLDER'),
+('lead','LEAD-CLEAR','Lead clearance cleaning, HEPA and wet wipe','sf',1.35,2.00,'PLACEHOLDER'),
+('lead','LEAD-DISP','Lead hazardous waste disposal, 55 gal drum','ea',220.00,320.00,'PLACEHOLDER'),
+('lead','LEAD-RRP','RRP-compliant containment and setup, per work area','ls',1250.00,1800.00,'PLACEHOLDER'),
+('lead','LEAD-WORKER','Lead-certified abatement worker','hr',60.00,86.00,'PLACEHOLDER'),
 
 -- ── mold ────────────────────────────────────────────────────────────────────
 ('mold','MOLD-HEPA','HEPA vacuum and damp wipe non-porous surfaces','sf',1.85,2.70,'PLACEHOLDER'),
@@ -108,8 +122,8 @@ insert into unit_prices (category, item_code, description, unit, unit_cost, unit
 ('testing','TST-CLEAR','Visual clearance inspection and written report','ea',425.00,620.00,'PLACEHOLDER'),
 ('testing','TST-MOLD-INSP','Mold inspection with moisture mapping and report','ea',495.00,720.00,'PLACEHOLDER'),
 ('testing','TST-MOLD-SAMPLE','Mold air or surface sample with laboratory analysis','ea',85.00,125.00,'PLACEHOLDER'),
-('testing','TST-LEAD-XRF','Lead-based paint XRF inspection, per building','ea',650.00,950.00,'PLACEHOLDER — lead is not an advertised service; confirm before quoting, or deactivate this row'),
-('testing','TST-LEAD-DUST','Lead dust wipe sample with laboratory analysis','ea',55.00,80.00,'PLACEHOLDER — lead is not an advertised service; confirm before quoting, or deactivate this row'),
+('testing','TST-LEAD-XRF','Lead-based paint XRF inspection, per building','ea',650.00,950.00,'PLACEHOLDER'),
+('testing','TST-LEAD-DUST','Lead dust wipe sample with laboratory analysis','ea',55.00,80.00,'PLACEHOLDER'),
 ('testing','TST-IAQ','Indoor air quality assessment and report','ea',975.00,1400.00,'PLACEHOLDER'),
 ('testing','TST-REPORT','Report preparation, certification and delivery','ea',385.00,560.00,'PLACEHOLDER'),
 

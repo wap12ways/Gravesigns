@@ -96,6 +96,27 @@ Sewer
 - Sewer video inspections
 - Trenchless sewer repair (CIPP lining, pipe bursting)
 - Sewer line cleaning
+- Sanitary sewer extension and underground work (bid Clean Water Services
+  project 7251 in 2024)
+
+Demolition
+- Structural and selective demolition, including foundations, slabs on grade
+  and landscape features
+- Site clearing, grubbing, backfill and grading
+- Utility disconnection and removal
+- Demolition debris removal and disposal
+NOT on the website, but the public record is unambiguous: Alpha won Metro
+ITB 4313 in 2024 at $24,460 as low bidder, bid Metro's on-call demolition
+contract (ITB 4513) in January 2026 with a full unit price schedule, and bid
+two further Metro demolition jobs during 2025. Alpha's real demolition unit
+prices are loaded in the price book.
+
+Lead
+- Lead paint abatement, including exterior work
+- Lead inspection, XRF testing and dust wipe sampling
+Also absent from the website, also in the record: FAA contract
+697DCK25P00065, June 2025, $78,095 for exterior lead paint abatement at the
+Burns VOR site, and an ODOT asbestos and lead survey in 2023.
 
 Testing and consulting (this half is as much a fit as the remediation half)
 - Environmental surveys, bulk and air sampling, laboratory coordination
@@ -118,19 +139,17 @@ TYPICAL PROJECT SIZE: $10,000 to $500,000. Testing and survey contracts run
 smaller than remediation and are still worth bidding — do not penalise a
 $15,000 asbestos survey contract for being small.
 
-NOT A FIT — Alpha does not self-perform these, so score "no_bid" on trade
-grounds:
-- Lead paint abatement and lead-safe renovation
-- Demolition of any kind: structural, selective or interior
+COMPETITIVE NOTE, from public bid tabulations. Alpha wins small, well-defined
+demolition work — low bidder at $24,460 on Metro ITB 4313 — but has priced far
+above the field on larger lump-sum demolition: $175,848 against a $28,750
+winner on Metro ITB 4489, and $148,954 against $42,590 on ITB 4512. On
+abatement Alpha is strong: highest-scored of six firms on Portland Community
+College's district-wide hazardous materials abatement RFP (December 2025) and
+a full-service asbestos abatement contract holder with Metro. Weigh a large
+lump-sum demolition bid accordingly — flag it for review rather than treating
+it as an easy win.
 
-IMPORTANT on the two above. A solicitation is only a no_bid if the lead or
-demolition work IS the job. Public work very often bundles our trade into a
-demolition or renovation package — "pre-demolition asbestos survey and
-abatement", "abate ACM prior to demolition by others", "lead and asbestos
-survey". Where Alpha's own trade is a real, separable part of the scope, score
-it on that part and recommend "bid" or "review", not "no_bid".
-
-ALSO NOT A FIT: new construction general contracting, civil and heavy highway,
+NOT A FIT: new construction general contracting, civil and heavy highway,
 paving, landscaping, roofing, IT and software, professional consulting outside
 the environmental field, food and commodity supply, staffing contracts.`;
 

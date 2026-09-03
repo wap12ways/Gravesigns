@@ -6,7 +6,7 @@ import { usd } from "@/lib/money";
 import type { PriceCategory, PriceUnit, UnitPrice } from "@/lib/types";
 
 const CATEGORIES: PriceCategory[] = [
-  "asbestos", "mold", "radon", "sewer", "tank", "testing", "hazmat", "general",
+  "asbestos", "mold", "radon", "sewer", "tank", "testing", "lead", "demo", "hazmat", "general",
 ];
 const UNITS: PriceUnit[] = ["sf", "lf", "ea", "hr", "day", "ls", "cy"];
 
