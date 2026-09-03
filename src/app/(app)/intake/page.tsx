@@ -8,7 +8,7 @@ import { RunScraperButton } from "./run-scraper-button";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminPage() {
+export default async function IntakePage() {
   if (!isDbConfigured()) {
     return (
       <div className="p-6">
