@@ -11,7 +11,7 @@
 --
 -- unit_price holds the submitted bid price. unit_cost is left at 0 because
 -- Alpha's internal cost is not public — enter your real cost to make the
--- margin column on /prices mean anything.
+-- margin column on /cost-library mean anything.
 --
 -- Run AFTER 0002_restore_demo_and_lead.sql. Safe to run more than once, and it
 -- will not overwrite a rate you have since edited by hand.

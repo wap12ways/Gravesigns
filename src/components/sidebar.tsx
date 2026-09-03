@@ -3,10 +3,19 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const NAV = [
+interface NavItem {
+  href: string;
+  label: string;
+  /** Announced but not built. Rendered inert with a "Soon" tag. */
+  soon?: boolean;
+}
+
+const NAV: NavItem[] = [
   { href: "/", label: "Pipeline" },
-  { href: "/prices", label: "Unit prices" },
+  { href: "/estimates", label: "Estimates" },
+  { href: "/cost-library", label: "Cost library" },
   { href: "/intake", label: "Intake" },
+  { href: "/takeoff", label: "Takeoff", soon: true },
 ];
 
 export function Sidebar() {
@@ -23,6 +32,22 @@ export function Sidebar() {
 
       <div className="flex-1 py-2">
         {NAV.map((item) => {
+          if (item.soon) {
+            return (
+              <div
+                key={item.href}
+                title="Not built yet"
+                aria-disabled="true"
+                className="flex cursor-default items-center gap-2 border-l-2 border-transparent px-4 py-2 text-sm text-slate-600"
+              >
+                {item.label}
+                <span className="rounded bg-ink-700 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                  Soon
+                </span>
+              </div>
+            );
+          }
+
           const active =
             item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
           return (

@@ -9,7 +9,7 @@
 --
 -- EVERY ROW IS A PLACEHOLDER. The numbers are plausible 2026 Portland-market
 -- figures assembled for testing the estimator, NOT Alpha's real rates. Replace
--- them from /prices (edit in place, or CSV import) before quoting anything.
+-- them from /cost-library (edit in place, or CSV import) before quoting anything.
 --
 -- unit_cost  = what the work costs Alpha (labour + material + disposal)
 -- unit_price = what it sells for before project markup and contingency

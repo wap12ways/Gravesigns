@@ -44,7 +44,7 @@ Create a project, then in **SQL Editor** run, in order:
    and general conditions.
 
 > Rates flagged `PLACEHOLDER` in their `notes` are invented, if plausible for
-> the Portland market. Replace them from `/prices` before quoting real work.
+> the Portland market. Replace them from `/cost-library` before quoting real work.
 >
 > Rates flagged `ACTUAL` are Alpha's own submitted prices, lifted from the
 > public bid tabulation for Oregon Metro ITB 4513 (opened 8 January 2026).
@@ -161,6 +161,10 @@ src/
   app/
     login/         password gate
     (app)/         everything behind the gate
+      /            Pipeline — every solicitation, scored
+      estimates/   Estimates — every version, with delete
+      cost-library/ the rate book
+      intake/      import, scrape, batch analyse, connection check
     api/           route handlers
 supabase/
   migrations/      schema
